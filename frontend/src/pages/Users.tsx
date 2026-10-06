@@ -477,6 +477,17 @@ export default function Users() {
     );
 
     setEditRoleId(currentRole?.id || '');
+
+    if (
+      currentRole?.scope?.toUpperCase() === 'BRANCH' &&
+      userCompanyIdForEdit(selectedUser)
+    ) {
+      await loadEditBranches(userCompanyIdForEdit(selectedUser));
+    }
+  }
+
+  function userCompanyIdForEdit(user: AdminUser | null) {
+    return user?.company_id || '';
   }
 
   async function loadEditBranches(companyId: string) {
