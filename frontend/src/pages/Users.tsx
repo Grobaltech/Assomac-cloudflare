@@ -108,6 +108,24 @@ export default function Users() {
   const [editStatus, setEditStatus] =
     useState('ACTIVE');
 
+  const [editRoleId, setEditRoleId] =
+    useState('');
+
+  const [editCompanyId, setEditCompanyId] =
+    useState('');
+
+  const [editBranchId, setEditBranchId] =
+    useState('');
+
+  const [editBranches, setEditBranches] =
+    useState<{ id: string; company_id: string; name: string }[]>([]);
+
+  const [editRoles, setEditRoles] =
+    useState<{ id: string; code: string; name: string; scope: string }[]>([]);
+
+  const [editCompanies, setEditCompanies] =
+    useState<{ id: string; name: string }[]>([]);
+
   const [inviteEmail, setInviteEmail] =
     useState('');
 
@@ -395,6 +413,12 @@ export default function Users() {
   function openEdit(user: AdminUser) {
     setSelectedUser(user);
 
+    loadEditAccessOptions();
+
+    setEditRoleId('');
+    setEditCompanyId(user.company_id || '');
+    setEditBranchId(user.branch_id || '');
+
     setEditFullName(
       user.full_name || ''
     );
@@ -419,6 +443,193 @@ export default function Users() {
     setModalMode('view');
     setMessage('');
     setErrorMessage('');
+  }
+
+  async function loadEditAccessOptions() {
+    const [{ data: rolesData }, { data: companiesData }] =
+      await Promise.all([
+        supabase
+          .from('roles')
+          .select('id, code, name, scope')
+          .order('name'),
+        supabase
+          .from('companies')
+          .select('id, name')
+          .order('name'),
+      ]);
+
+    const loadedRoles =
+      (rolesData || []) as {
+        id: string;
+        code: string;
+        name: string;
+        scope: string;
+      }[];
+
+    const loadedCompanies =
+      (companiesData || []) as { id: string; name: string }[];
+
+    setEditRoles(loadedRoles);
+    setEditCompanies(loadedCompanies);
+
+    const currentRole = loadedRoles.find(
+      (role) => role.code === selectedUser?.role_code
+    );
+
+    setEditRoleId(currentRole?.id || '');
+  }
+
+  async function loadEditBranches(companyId: string) {
+    if (!companyId) {
+      setEditBranches([]);
+      setEditBranchId('');
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('branches')
+      .select('id, company_id, name')
+      .eq('company_id', companyId)
+      .order('name');
+
+    if (error) {
+      console.error(error);
+      setEditBranches([]);
+      setEditBranchId('');
+      setErrorMessage(error.message || 'Unable to load branches.');
+      return;
+    }
+
+    setEditBranches(
+      (data || []) as {
+        id: string;
+        company_id: string;
+        name: string;
+      }[]
+    );
+  }
+
+  function selectedEditRole() {
+    return editRoles.find((role) => role.id === editRoleId) || null;
+  }
+
+  function handleEditRoleChange(roleId: string) {
+    setEditRoleId(roleId);
+
+    const role = editRoles.find((item) => item.id === roleId);
+    const scope = role?.scope?.toUpperCase();
+
+    if (scope === 'COMPANY' || scope === 'BRANCH') {
+      setEditCompanyId(selectedUser?.company_id || '');
+      if (selectedUser?.company_id) {
+        loadEditBranches(selectedUser.company_id);
+      }
+    } else {
+      setEditCompanyId('');
+      setEditBranchId('');
+      setEditBranches([]);
+    }
+
+    if (scope !== 'BRANCH') {
+      setEditBranchId('');
+    }
+  }
+
+  async function saveUserAccess() {
+    if (!selectedUser) return;
+
+    const role = selectedEditRole();
+
+    if (!role) {
+      setErrorMessage('Please select a valid role.');
+      return;
+    }
+
+    const scope = role.scope?.toUpperCase();
+
+    if ((scope === 'COMPANY' || scope === 'BRANCH') && !editCompanyId) {
+      setErrorMessage('Please select a company for this role.');
+      return;
+    }
+
+    if (scope === 'BRANCH' && !editBranchId) {
+      setErrorMessage('Please select a branch for this role.');
+      return;
+    }
+
+    setSaving(true);
+    setMessage('');
+    setErrorMessage('');
+
+    const { error } = await supabase.rpc(
+      'admin_update_user_access',
+      {
+        p_user_id: selectedUser.user_id,
+        p_role_id: role.id,
+        p_company_id:
+          scope === 'COMPANY' || scope === 'BRANCH'
+            ? editCompanyId
+            : null,
+        p_branch_id:
+          scope === 'BRANCH'
+            ? editBranchId
+            : null,
+      }
+    );
+
+    if (error) {
+      console.error(error);
+      setErrorMessage(
+        error.message || 'Unable to update user role and scope.'
+      );
+      setSaving(false);
+      return;
+    }
+
+    setMessage('User role and organizational scope updated successfully.');
+    await loadUsers();
+    setModalMode('view');
+    setSaving(false);
+  }
+
+  async function deleteUser(user: AdminUser) {
+    const name = user.common_name || user.full_name || user.email;
+
+    const confirmed = window.confirm(
+      'PERMANENT USER DELETION\\n\\n' +
+      'This will permanently delete ' +
+      name +
+      ' (' +
+      user.email +
+      ') and their application account, profile and role assignments.\\n\\n' +
+      'This action cannot be undone.\\n\\nContinue?'
+    );
+
+    if (!confirmed) return;
+
+    setSaving(true);
+    setMessage('');
+    setErrorMessage('');
+
+    const { error } = await supabase.rpc(
+      'admin_delete_user',
+      { p_user_id: user.user_id }
+    );
+
+    if (error) {
+      console.error(error);
+      setErrorMessage(
+        error.message || 'Unable to delete this user.'
+      );
+      setSaving(false);
+      return;
+    }
+
+    setSelectedUser(null);
+    setModalMode('view');
+    setMessage('User deleted successfully.');
+    await loadUsers();
+    setSaving(false);
   }
 
   async function saveUser() {
@@ -1656,6 +1867,107 @@ export default function Users() {
 
                 </div>
 
+                <div className="form-section-title">
+                  Role & Organizational Access
+                </div>
+
+                <div className="form-grid">
+
+                  <div className="form-field">
+                    <label>Role</label>
+
+                    <select
+                      value={editRoleId}
+                      onChange={(event) =>
+                        handleEditRoleChange(event.target.value)
+                      }
+                    >
+                      <option value="">
+                        Select role
+                      </option>
+
+                      {editRoles.map((role) => (
+                        <option key={role.id} value={role.id}>
+                          {role.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="form-field">
+                    <label>Scope</label>
+
+                    <input
+                      value={selectedEditRole()?.scope || '—'}
+                      disabled
+                      readOnly
+                    />
+                  </div>
+
+                </div>
+
+                {(selectedEditRole()?.scope === 'COMPANY' ||
+                  selectedEditRole()?.scope === 'BRANCH') && (
+                  <div className="form-grid">
+
+                    <div className="form-field">
+                      <label>Company</label>
+
+                      <select
+                        value={editCompanyId}
+                        onChange={(event) => {
+                          const companyId = event.target.value;
+                          setEditCompanyId(companyId);
+                          setEditBranchId('');
+
+                          if (
+                            selectedEditRole()?.scope === 'BRANCH'
+                          ) {
+                            loadEditBranches(companyId);
+                          } else {
+                            setEditBranches([]);
+                          }
+                        }}
+                      >
+                        <option value="">
+                          Select company
+                        </option>
+
+                        {editCompanies.map((company) => (
+                          <option key={company.id} value={company.id}>
+                            {company.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {selectedEditRole()?.scope === 'BRANCH' && (
+                      <div className="form-field">
+                        <label>Branch</label>
+
+                        <select
+                          value={editBranchId}
+                          onChange={(event) =>
+                            setEditBranchId(event.target.value)
+                          }
+                          disabled={!editCompanyId}
+                        >
+                          <option value="">
+                            Select branch
+                          </option>
+
+                          {editBranches.map((branch) => (
+                            <option key={branch.id} value={branch.id}>
+                              {branch.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                  </div>
+                )}
+
                 <div className="permission-notice">
                   <div>
                     🔐
@@ -1663,16 +1975,13 @@ export default function Users() {
 
                   <div>
                     <strong>
-                      Protected information
+                      Super Administrator control
                     </strong>
 
                     <p>
-                      Role, company,
-                      branch and
-                      permissions are
-                      controlled separately
-                      by the administrator
-                      security layer.
+                      Changing a role replaces the user's active role
+                      assignment. Company and branch scope is validated
+                      again by the database before the change is accepted.
                     </p>
                   </div>
                 </div>
@@ -1733,6 +2042,17 @@ export default function Users() {
 
                   <button
                     type="button"
+                    className="danger-button"
+                    onClick={() =>
+                      deleteUser(selectedUser)
+                    }
+                    disabled={saving}
+                  >
+                    Delete User
+                  </button>
+
+                  <button
+                    type="button"
                     className="secondary-button"
                     onClick={
                       closeUserModal
@@ -1747,9 +2067,7 @@ export default function Users() {
                     type="button"
                     className="secondary-button"
                     onClick={() =>
-                      setModalMode(
-                        'view'
-                      )
+                      setModalMode('view')
                     }
                     disabled={saving}
                   >
@@ -1759,14 +2077,23 @@ export default function Users() {
                   <button
                     type="button"
                     className="primary-button"
-                    onClick={
-                      saveUser
-                    }
+                    onClick={saveUser}
                     disabled={saving}
                   >
                     {saving
                       ? 'Saving...'
-                      : 'Save Changes'}
+                      : 'Save Profile'}
+                  </button>
+
+                  <button
+                    type="button"
+                    className="primary-button"
+                    onClick={saveUserAccess}
+                    disabled={saving}
+                  >
+                    {saving
+                      ? 'Saving...'
+                      : 'Save Access'}
                   </button>
                 </>
               )}
