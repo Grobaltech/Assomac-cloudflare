@@ -54,16 +54,16 @@ async function sendInvitationEmail(request: Request, env: Env): Promise<Response
     return json({ error: 'Invitation ID and invitation token are required.' }, 400);
   }
 
-  const userResponse = await fetch(\`\${env.SUPABASE_URL}/auth/v1/user\`, {
-    headers: { apikey: env.SUPABASE_ANON_KEY, authorization: \`Bearer \${accessToken}\` },
+  const userResponse = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, {
+    headers: { apikey: env.SUPABASE_ANON_KEY, authorization: `Bearer ${accessToken}` },
   });
   if (!userResponse.ok) return json({ error: 'Your session is invalid or expired.' }, 401);
 
-  const rpcResponse = await fetch(\`\${env.SUPABASE_URL}/rest/v1/rpc/prepare_user_invitation_email\`, {
+  const rpcResponse = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/prepare_user_invitation_email`, {
     method: 'POST',
     headers: {
       apikey: env.SUPABASE_ANON_KEY,
-      authorization: \`Bearer \${accessToken}\`,
+      authorization: `Bearer ${accessToken}`,
       'content-type': 'application/json',
     },
     body: JSON.stringify({ p_invitation_id: invitationId, p_invitation_token: invitationToken }),
@@ -81,24 +81,24 @@ async function sendInvitationEmail(request: Request, env: Env): Promise<Response
   if (!invitation) return json({ error: 'Invitation details were not found.' }, 404);
 
   const origin = request.headers.get('origin') || new URL(request.url).origin;
-  const invitationUrl = \`\${origin}/accept-invitation?token=\${encodeURIComponent(invitationToken)}\`;
+  const invitationUrl = `${origin}/accept-invitation?token=${encodeURIComponent(invitationToken)}`;
   const roleText = invitation.role_name || invitation.role_code || 'ASOMAC user';
 
-  const html = \`<!doctype html><html><body style="margin:0;padding:0;background:#f4f7fb;font-family:Arial,Helvetica,sans-serif;color:#26344a;">
+  const html = `<!doctype html><html><body style="margin:0;padding:0;background:#f4f7fb;font-family:Arial,Helvetica,sans-serif;color:#26344a;">
 <div style="max-width:620px;margin:0 auto;padding:36px 18px;"><div style="background:#fff;border-radius:20px;padding:34px;box-shadow:0 10px 30px rgba(0,25,76,.10);">
 <div style="font-size:12px;font-weight:800;letter-spacing:.14em;color:#f35a02;margin-bottom:8px;">ASOMAC PLATFORM</div>
 <h1 style="margin:0 0 14px;color:#00194c;font-size:28px;">You have been invited</h1>
-<p style="font-size:15px;line-height:1.65;">You have been invited to join ASOMAC as <strong>\${escapeHtml(roleText)}</strong>.</p>
-\${invitation.company_name ? \`<p><strong>Company:</strong> \${escapeHtml(invitation.company_name)}</p>\` : ''}
-\${invitation.branch_name ? \`<p><strong>Branch:</strong> \${escapeHtml(invitation.branch_name)}</p>\` : ''}
-<p><strong>Invitation expires:</strong> \${escapeHtml(formatExpiry(invitation.expires_at))} (Uganda time)</p>
-<div style="margin:28px 0;"><a href="\${escapeHtml(invitationUrl)}" style="display:inline-block;padding:14px 22px;border-radius:12px;background:#f35a02;color:#fff;text-decoration:none;font-weight:700;">Accept Invitation</a></div>
+<p style="font-size:15px;line-height:1.65;">You have been invited to join ASOMAC as <strong>${escapeHtml(roleText)}</strong>.</p>
+${invitation.company_name ? `<p><strong>Company:</strong> ${escapeHtml(invitation.company_name)}</p>` : ''}
+${invitation.branch_name ? `<p><strong>Branch:</strong> ${escapeHtml(invitation.branch_name)}</p>` : ''}
+<p><strong>Invitation expires:</strong> ${escapeHtml(formatExpiry(invitation.expires_at))} (Uganda time)</p>
+<div style="margin:28px 0;"><a href="${escapeHtml(invitationUrl)}" style="display:inline-block;padding:14px 22px;border-radius:12px;background:#f35a02;color:#fff;text-decoration:none;font-weight:700;">Accept Invitation</a></div>
 <p style="font-size:12px;line-height:1.6;color:#748096;">This private invitation can only be used for the invited email address. If you were not expecting it, you can ignore this message.</p>
-</div></div></body></html>\`;
+</div></div></body></html>`;
 
   const resendResponse = await fetch('https://api.resend.com/emails', {
     method: 'POST',
-    headers: { authorization: \`Bearer \${env.RESEND_API_KEY}\`, 'content-type': 'application/json' },
+    headers: { authorization: `Bearer ${env.RESEND_API_KEY}`, 'content-type': 'application/json' },
     body: JSON.stringify({
       from: env.RESEND_FROM_EMAIL,
       to: [invitation.email],
@@ -111,11 +111,11 @@ async function sendInvitationEmail(request: Request, env: Env): Promise<Response
     return json({ error: 'Invitation email could not be sent.', details: await resendResponse.text() }, 502);
   }
 
-  const markResponse = await fetch(\`\${env.SUPABASE_URL}/rest/v1/rpc/mark_user_invitation_email_sent\`, {
+  const markResponse = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/mark_user_invitation_email_sent`, {
     method: 'POST',
     headers: {
       apikey: env.SUPABASE_ANON_KEY,
-      authorization: \`Bearer \${accessToken}\`,
+      authorization: `Bearer ${accessToken}`,
       'content-type': 'application/json',
     },
     body: JSON.stringify({ p_invitation_id: invitationId }),
