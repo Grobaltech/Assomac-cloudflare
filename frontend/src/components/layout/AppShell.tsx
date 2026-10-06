@@ -206,6 +206,8 @@ export default function AppShell({ children }: AppShellProps) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [role, setRole] = useState<UserRole | null>(null);
 
+  const isSuperAdmin = role?.role_code === 'SUPER_ADMIN';
+
   const profileRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -310,6 +312,13 @@ export default function AppShell({ children }: AppShellProps) {
       path: '/users',
       icon: 'users',
     },
+    ...(isSuperAdmin
+      ? [{
+          label: 'Sent Invitations',
+          path: '/sent-invitations',
+          icon: 'bell',
+        }]
+      : []),
     {
       label: 'Companies',
       path: '/companies',
@@ -449,6 +458,8 @@ export default function AppShell({ children }: AppShellProps) {
                   ? 'Dashboard'
                   : location.pathname === '/users'
                   ? 'Users'
+                  : location.pathname === '/sent-invitations'
+                  ? 'Sent Invitations'
                   : location.pathname === '/companies'
                   ? 'Companies'
                   : location.pathname === '/transfers'
