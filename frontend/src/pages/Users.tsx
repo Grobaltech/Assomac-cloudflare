@@ -120,6 +120,12 @@ export default function Users() {
   const [inviteRole, setInviteRole] =
     useState('ASOMAC_ADMIN');
 
+  const [inviteRoles, setInviteRoles] =
+    useState<{ id: string; code: string; name: string; scope: string }[]>([]);
+
+  const [generatedInvitation, setGeneratedInvitation] =
+    useState<{ token: string; expiresAt: string; url: string } | null>(null);
+
   async function loadUsers(showRefresh = false) {
     if (showRefresh) {
       setRefreshing(true);
@@ -152,7 +158,14 @@ export default function Users() {
 
   useEffect(() => {
     loadUsers();
+    loadInviteRoles();
   }, []);
+
+  async function loadInviteRoles() {
+    const { data, error } = await supabase.from('roles').select('id, code, name, scope').order('name');
+    if (error) { console.error(error); return; }
+    setInviteRoles((data || []) as { id: string; code: string; name: string; scope: string }[]);
+  }
 
   const roles = useMemo(() => {
     return Array.from(
@@ -389,48 +402,57 @@ export default function Users() {
     setSaving(false);
   }
 
-  async function submitInvitation(
-    event: FormEvent<HTMLFormElement>
-  ) {
+  async function submitInvitation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
     setMessage('');
     setErrorMessage('');
+    setGeneratedInvitation(null);
 
     if (!inviteEmail.trim()) {
-      setErrorMessage(
-        'Email address is required.'
-      );
+      setErrorMessage('Email address is required.');
+      return;
+    }
+
+    const selectedRole = inviteRoles.find((role) => role.code === inviteRole);
+    if (!selectedRole) {
+      setErrorMessage('Please select a valid role.');
       return;
     }
 
     setSaving(true);
 
-    /*
-     * User creation/invitation will be connected
-     * to the Supabase Auth invitation workflow
-     * after the corresponding secure RPC is added.
-     *
-     * We deliberately do not create an auth user
-     * directly from the browser.
-     */
+    const { data, error } = await supabase.rpc('create_user_invitation', {
+      p_email: inviteEmail.trim().toLowerCase(),
+      p_role_id: selectedRole.id,
+      p_company_id: null,
+      p_branch_id: null,
+      p_expires_in_hours: 168,
+    });
 
-    setTimeout(() => {
+    if (error) {
+      console.error(error);
+      setErrorMessage(error.message || 'Unable to create invitation.');
       setSaving(false);
+      return;
+    }
 
-      setShowInviteModal(false);
+    const result = Array.isArray(data) ? data[0] : data;
+    if (!result?.invitation_token) {
+      setErrorMessage('Invitation was created but no token was returned.');
+      setSaving(false);
+      return;
+    }
 
-      setInviteEmail('');
-      setInviteName('');
-      setInvitePhone('');
-      setInviteRole(
-        'ASOMAC_ADMIN'
-      );
+    const url = window.location.origin + '/accept-invitation?token=' + encodeURIComponent(result.invitation_token);
 
-      setMessage(
-        'Invitation workflow is ready for the secure Supabase invitation RPC.'
-      );
-    }, 400);
+    setGeneratedInvitation({
+      token: result.invitation_token,
+      expiresAt: result.expires_at,
+      url,
+    });
+
+    setSaving(false);
+    setMessage('Invitation created securely. Copy the invitation link and send it to the invited user.');
   }
 
   return (
@@ -1620,7 +1642,28 @@ export default function Users() {
 
               </div>
 
-              <div className="modal-actions">
+              {generatedInvitation && (
+          <div className="generated-invitation">
+            <strong>Invitation link generated</strong>
+            <p>Send this link to the invited user. It expires on {new Date(generatedInvitation.expiresAt).toLocaleString()}.</p>
+            <div className="invitation-link-row">
+              <input value={generatedInvitation.url} readOnly />
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={async () => {
+                  await navigator.clipboard.writeText(generatedInvitation.url);
+                  setMessage('Invitation link copied to clipboard.');
+                }}
+              >
+                Copy Link
+              </button>
+            </div>
+            <small>The raw token is never stored in Supabase. This link contains the one-time token returned at creation.</small>
+          </div>
+        )}
+
+        <div className="modal-actions">
 
                 <button
                   type="button"
@@ -2355,6 +2398,49 @@ export default function Users() {
         .danger-button:disabled {
           opacity: 0.55;
           cursor: not-allowed;
+        }
+
+        .generated-invitation {
+          margin-top: 18px;
+          padding: 15px;
+          border-radius: 14px;
+          background: #edf8f1;
+          border: 1px solid #cde9d7;
+        }
+
+        .generated-invitation strong {
+          display: block;
+          color: #176b35;
+          font-size: 13px;
+          margin-bottom: 5px;
+        }
+
+        .generated-invitation p,
+        .generated-invitation small {
+          display: block;
+          color: #647a6b;
+          font-size: 11px;
+          line-height: 1.5;
+        }
+
+        .generated-invitation p { margin: 0 0 10px; }
+        .generated-invitation small { margin-top: 8px; }
+
+        .invitation-link-row {
+          display: flex;
+          gap: 8px;
+        }
+
+        .invitation-link-row input {
+          flex: 1;
+          min-width: 0;
+          min-height: 42px;
+          padding: 0 10px;
+          border: 1px solid #d9e6dd;
+          border-radius: 10px;
+          background: #fff;
+          color: #26344a;
+          font-size: 11px;
         }
 
         @media (max-width: 1000px) {
