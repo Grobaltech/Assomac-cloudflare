@@ -23,6 +23,7 @@ import LandingPage from './pages/LandingPage';
 import Admin from './pages/Admin';
 import CompanyPage from './pages/CompanyPage';
 import Users from './pages/Users';
+import SentInvitations from './pages/SentInvitations';
 import AcceptInvitation from './pages/AcceptInvitation';
 
 import AppShell from './components/layout/AppShell';
@@ -501,6 +502,15 @@ export default function App() {
         element={
           <Protected>
             <Users />
+          </Protected>
+        }
+      />
+
+      <Route
+        path="/sent-invitations"
+        element={
+          <Protected>
+            <SentInvitations />
           </Protected>
         }
       />
