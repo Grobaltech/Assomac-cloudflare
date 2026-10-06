@@ -451,8 +451,57 @@ export default function Users() {
       url,
     });
 
+    const {
+      data: sessionData,
+    } = await supabase.auth.getSession();
+
+    const accessToken =
+      sessionData.session?.access_token;
+
+    if (!accessToken) {
+      setSaving(false);
+      setErrorMessage(
+        'Invitation was created, but your session is no longer available to send the email. Copy the invitation link below and send it manually.'
+      );
+      return;
+    }
+
+    const emailResponse =
+      await fetch('/api/invitations/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          invitation_id: result.invitation_id,
+          invitation_token: result.invitation_token,
+        }),
+      });
+
+    if (!emailResponse.ok) {
+      let details = 'Invitation was created, but the email could not be sent.';
+
+      try {
+        const emailResult = await emailResponse.json();
+        if (emailResult?.error) {
+          details = emailResult.error;
+        }
+      } catch {
+        // Keep the safe fallback message.
+      }
+
+      setSaving(false);
+      setErrorMessage(
+        `${details} You can still copy the invitation link below.`
+      );
+      return;
+    }
+
     setSaving(false);
-    setMessage('Invitation created securely. Copy the invitation link and send it to the invited user.');
+    setMessage(
+      'Invitation created and emailed successfully. The secure invitation link is also available below.'
+    );
   }
 
   return (
