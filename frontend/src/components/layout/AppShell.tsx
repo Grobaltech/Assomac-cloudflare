@@ -253,31 +253,42 @@ export default function AppShell({ children }: AppShellProps) {
       setProfile(profileData);
     }
 
-    const { data: roleData } = await supabase
+    // Load the active role in two steps instead of relying on
+    // Supabase's nested relationship response.
+    const { data: userRoleData, error: userRoleError } = await supabase
       .from('user_roles')
-      .select(`
-        role_id,
-        roles (
-          code,
-          name
-        )
-      `)
+      .select('role_id')
       .eq('user_id', user.id)
       .is('ended_at', null)
+      .order('assigned_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 
-    if (roleData?.roles) {
-      const roleInfo = Array.isArray(roleData.roles)
-        ? roleData.roles[0]
-        : roleData.roles;
+    if (userRoleError) {
+      console.error('Unable to load current user role:', userRoleError);
+      return;
+    }
 
-      if (roleInfo) {
-        setRole({
-          role_code: roleInfo.code,
-          role_name: roleInfo.name,
-        });
-      }
+    if (!userRoleData?.role_id) {
+      return;
+    }
+
+    const { data: roleInfo, error: roleError } = await supabase
+      .from('roles')
+      .select('code, name')
+      .eq('id', userRoleData.role_id)
+      .maybeSingle();
+
+    if (roleError) {
+      console.error('Unable to load current role details:', roleError);
+      return;
+    }
+
+    if (roleInfo) {
+      setRole({
+        role_code: roleInfo.code,
+        role_name: roleInfo.name,
+      });
     }
   }
 
