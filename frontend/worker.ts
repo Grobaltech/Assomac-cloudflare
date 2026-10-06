@@ -27,12 +27,136 @@ function formatExpiry(value: string): string {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+    if (url.pathname === '/api/email/check' && request.method === 'POST') {
+      return checkEmailAddress(request, env);
+    }
+
     if (url.pathname === '/api/invitations/send' && request.method === 'POST') {
       return sendInvitationEmail(request, env);
     }
     return env.ASSETS.fetch(request);
   },
 };
+
+async function checkEmailAddress(request: Request, env: Env): Promise<Response> {
+  const authorization = request.headers.get('authorization');
+
+  if (!authorization?.toLowerCase().startsWith('bearer ')) {
+    return json({ error: 'Authentication required.' }, 401);
+  }
+
+  const accessToken = authorization.slice(7).trim();
+
+  if (!accessToken) {
+    return json({ error: 'Authentication required.' }, 401);
+  }
+
+  const userResponse = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, {
+    headers: {
+      apikey: env.SUPABASE_ANON_KEY,
+      authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!userResponse.ok) {
+    return json({ error: 'Your session is invalid or expired.' }, 401);
+  }
+
+  let body: { email?: string };
+
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: 'Invalid JSON request.' }, 400);
+  }
+
+  const email = body.email?.trim().toLowerCase();
+
+  if (!email || email.length > 254) {
+    return json({
+      valid: false,
+      reason: 'Please enter a valid email address.',
+    });
+  }
+
+  const formatOk = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email);
+
+  if (!formatOk) {
+    return json({
+      valid: false,
+      reason: 'The email address format is not valid.',
+    });
+  }
+
+  const at = email.lastIndexOf('@');
+  const domain = email.slice(at + 1).replace(/^@+/, '').replace(/\\.+$/, '');
+
+  if (!domain || domain.length > 253 || !domain.includes('.')) {
+    return json({
+      valid: false,
+      reason: 'The email domain is not valid.',
+    });
+  }
+
+  const dnsHeaders = {
+    accept: 'application/dns-json',
+  };
+
+  try {
+    const [mxResponse, aResponse, aaaaResponse] = await Promise.all([
+      fetch(
+        `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(domain)}&type=MX`,
+        { headers: dnsHeaders }
+      ),
+      fetch(
+        `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(domain)}&type=A`,
+        { headers: dnsHeaders }
+      ),
+      fetch(
+        `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(domain)}&type=AAAA`,
+        { headers: dnsHeaders }
+      ),
+    ]);
+
+    const mx = await mxResponse.json() as { Answer?: unknown[] };
+    const a = await aResponse.json() as { Answer?: unknown[] };
+    const aaaa = await aaaaResponse.json() as { Answer?: unknown[] };
+
+    const hasMx = Array.isArray(mx.Answer) && mx.Answer.length > 0;
+    const hasA = Array.isArray(a.Answer) && a.Answer.length > 0;
+    const hasAaaa = Array.isArray(aaaa.Answer) && aaaa.Answer.length > 0;
+
+    if (!hasMx && !hasA && !hasAaaa) {
+      return json({
+        valid: false,
+        reason: 'This email domain does not appear to accept email. Check the address and try again.',
+        email,
+        domain,
+      });
+    }
+
+    return json({
+      valid: true,
+      email,
+      domain,
+      checks: {
+        format: true,
+        domain: true,
+        mailServer: hasMx,
+      },
+      message: hasMx
+        ? 'Email format and mail server verified.'
+        : 'Email domain is reachable, but no MX record was found. The invitation may still be deliverable through the domain fallback.',
+    });
+  } catch (error) {
+    console.error('Email DNS check failed:', error);
+
+    return json({
+      valid: false,
+      reason: 'We could not verify this email domain right now. Please try again.',
+    }, 502);
+  }
+}
 
 async function sendInvitationEmail(request: Request, env: Env): Promise<Response> {
   const authorization = request.headers.get('authorization');
