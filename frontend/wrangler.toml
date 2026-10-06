@@ -1,4 +1,4 @@
-name = "assomac-cloudflare-updated"
+name = "assomac-cloudflare"
 main = "worker.ts"
 compatibility_date = "2026-10-01"
 
