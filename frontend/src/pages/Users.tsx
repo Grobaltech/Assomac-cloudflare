@@ -111,6 +111,18 @@ export default function Users() {
   const [inviteEmail, setInviteEmail] =
     useState('');
 
+  const [emailChecking, setEmailChecking] =
+    useState(false);
+
+  const [emailCheck, setEmailCheck] =
+    useState<{
+      status: 'idle' | 'checking' | 'valid' | 'invalid';
+      message: string;
+    }>({
+      status: 'idle',
+      message: '',
+    });
+
   const [inviteName, setInviteName] =
     useState('');
 
@@ -434,6 +446,89 @@ export default function Users() {
     setSaving(false);
   }
 
+  async function checkInviteEmail(showSuccess = true): Promise<boolean> {
+    const email = inviteEmail.trim().toLowerCase();
+
+    if (!email) {
+      setEmailCheck({
+        status: 'invalid',
+        message: 'Email address is required.',
+      });
+      return false;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setEmailCheck({
+        status: 'invalid',
+        message: 'Enter a valid email address.',
+      });
+      return false;
+    }
+
+    const {
+      data: sessionData,
+    } = await supabase.auth.getSession();
+
+    const accessToken =
+      sessionData.session?.access_token;
+
+    if (!accessToken) {
+      setEmailCheck({
+        status: 'invalid',
+        message: 'Your session has expired. Please sign in again.',
+      });
+      return false;
+    }
+
+    setEmailChecking(true);
+    setEmailCheck({
+      status: 'checking',
+      message: 'Checking email domain and mail server...',
+    });
+
+    try {
+      const response = await fetch('/api/email/check', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result?.valid) {
+        setEmailCheck({
+          status: 'invalid',
+          message:
+            result?.reason ||
+            'This email address could not be verified.',
+        });
+        return false;
+      }
+
+      setEmailCheck({
+        status: 'valid',
+        message:
+          showSuccess
+            ? (result.message || 'Email address verified.')
+            : '',
+      });
+
+      return true;
+    } catch (error) {
+      console.error(error);
+      setEmailCheck({
+        status: 'invalid',
+        message: 'Unable to check this email right now. Please try again.',
+      });
+      return false;
+    } finally {
+      setEmailChecking(false);
+    }
+  }
+
   async function submitInvitation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage('');
@@ -449,6 +544,15 @@ export default function Users() {
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setErrorMessage('Please enter a valid email address.');
+      return;
+    }
+
+    const emailIsValid = await checkInviteEmail(false);
+
+    if (!emailIsValid) {
+      setErrorMessage(
+        'Please correct the email address before sending the invitation.'
+      );
       return;
     }
 
@@ -1644,18 +1748,40 @@ export default function Users() {
 
                   <input
                     type="email"
-                    value={
-                      inviteEmail
-                    }
-                    onChange={(event) =>
-                      setInviteEmail(
-                        event.target
-                          .value
-                      )
-                    }
+                    value={inviteEmail}
+                    onChange={(event) => {
+                      setInviteEmail(event.target.value);
+                      setEmailCheck({
+                        status: 'idle',
+                        message: '',
+                      });
+                    }}
+                    onBlur={() => {
+                      if (inviteEmail.trim()) {
+                        void checkInviteEmail();
+                      }
+                    }}
                     placeholder="name@example.com"
                     required
+                    disabled={saving || emailChecking}
                   />
+
+                  {emailCheck.message && (
+                    <small
+                      style={{
+                        color:
+                          emailCheck.status === 'valid'
+                            ? '#248044'
+                            : emailCheck.status === 'invalid'
+                              ? '#bd392e'
+                              : '#66748a',
+                        fontWeight: 600,
+                      }}
+                    >
+                      {emailChecking ? '⏳ ' : emailCheck.status === 'valid' ? '✓ ' : emailCheck.status === 'invalid' ? '!' : ''}
+                      {emailCheck.message}
+                    </small>
+                  )}
 
                 </div>
 
@@ -1779,7 +1905,8 @@ export default function Users() {
                   className="primary-button"
                   disabled={
                     saving ||
-                    !inviteEmail.trim() ||
+                    emailChecking ||
+                    emailCheck.status !== 'valid' ||
                     !inviteRole ||
                     !inviteRoles.some((role) => role.code === inviteRole)
                   }
