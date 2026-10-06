@@ -79,7 +79,7 @@ async function checkEmailAddress(request: Request, env: Env): Promise<Response> 
     });
   }
 
-  const formatOk = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email);
+  const formatOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
   if (!formatOk) {
     return json({
@@ -89,7 +89,7 @@ async function checkEmailAddress(request: Request, env: Env): Promise<Response> 
   }
 
   const at = email.lastIndexOf('@');
-  const domain = email.slice(at + 1).replace(/^@+/, '').replace(/\\.+$/, '');
+  const domain = email.slice(at + 1).replace(/^@+/, '').replace(/\.+$/, '');
 
   if (!domain || domain.length > 253 || !domain.includes('.')) {
     return json({
