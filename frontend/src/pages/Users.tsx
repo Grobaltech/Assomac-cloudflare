@@ -701,6 +701,8 @@ export default function Users() {
     }
 
     setSaving(true);
+    setMessage('Creating the secure invitation...');
+    setErrorMessage('');
 
     const { data, error } = await supabase.rpc('create_user_invitation', {
       p_email: email,
@@ -737,6 +739,7 @@ export default function Users() {
       expiresAt: result.expires_at,
       url,
     });
+    setMessage('Invitation created. Sending the invitation email...');
 
     const {
       data: sessionData,
@@ -2124,7 +2127,6 @@ export default function Users() {
                   disabled={
                     saving ||
                     emailChecking ||
-                    emailCheck.status !== 'valid' ||
                     !inviteRole ||
                     !inviteRoles.some((role) => role.code === inviteRole) ||
                     (inviteRoleNeedsCompany() && !inviteCompanyId) ||
@@ -2132,8 +2134,10 @@ export default function Users() {
                   }
                 >
                   {saving
-                    ? 'Preparing...'
-                    : 'Send Invitation'}
+                    ? 'Sending Invitation...'
+                    : emailChecking
+                      ? 'Checking Email...'
+                      : 'Send Invitation'}
                 </button>
 
               </div>
