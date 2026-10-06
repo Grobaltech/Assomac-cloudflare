@@ -118,7 +118,7 @@ export default function Users() {
     useState('');
 
   const [inviteRole, setInviteRole] =
-    useState('ASOMAC_ADMIN');
+    useState('');
 
   const [inviteRoles, setInviteRoles] =
     useState<{ id: string; code: string; name: string; scope: string }[]>([]);
@@ -162,9 +162,41 @@ export default function Users() {
   }, []);
 
   async function loadInviteRoles() {
-    const { data, error } = await supabase.from('roles').select('id, code, name, scope').order('name');
-    if (error) { console.error(error); return; }
-    setInviteRoles((data || []) as { id: string; code: string; name: string; scope: string }[]);
+    const { data, error } = await supabase
+      .from('roles')
+      .select('id, code, name, scope')
+      .order('name');
+
+    if (error) {
+      console.error(error);
+      setInviteRoles([]);
+      setInviteRole('');
+      setErrorMessage(
+        error.message || 'Unable to load available invitation roles.'
+      );
+      return;
+    }
+
+    const availableRoles =
+      (data || []) as {
+        id: string;
+        code: string;
+        name: string;
+        scope: string;
+      }[];
+
+    setInviteRoles(availableRoles);
+
+    setInviteRole((currentRole) => {
+      if (
+        currentRole &&
+        availableRoles.some((role) => role.code === currentRole)
+      ) {
+        return currentRole;
+      }
+
+      return availableRoles[0]?.code || '';
+    });
   }
 
   const roles = useMemo(() => {
@@ -408,21 +440,40 @@ export default function Users() {
     setErrorMessage('');
     setGeneratedInvitation(null);
 
-    if (!inviteEmail.trim()) {
+    const email = inviteEmail.trim().toLowerCase();
+
+    if (!email) {
       setErrorMessage('Email address is required.');
       return;
     }
 
-    const selectedRole = inviteRoles.find((role) => role.code === inviteRole);
-    if (!selectedRole) {
-      setErrorMessage('Please select a valid role.');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setErrorMessage('Please enter a valid email address.');
+      return;
+    }
+
+    if (!inviteRoles.length) {
+      setErrorMessage(
+        'No invitation roles are available. Please refresh the page and try again.'
+      );
+      return;
+    }
+
+    const selectedRole = inviteRoles.find(
+      (role) => role.code === inviteRole
+    );
+
+    if (!inviteRole || !selectedRole) {
+      setErrorMessage(
+        'Please select a valid role from the available roles.'
+      );
       return;
     }
 
     setSaving(true);
 
     const { data, error } = await supabase.rpc('create_user_invitation', {
-      p_email: inviteEmail.trim().toLowerCase(),
+      p_email: email,
       p_role_id: selectedRole.id,
       p_company_id: null,
       p_branch_id: null,
@@ -1636,31 +1687,27 @@ export default function Users() {
                   </label>
 
                   <select
-                    value={
-                      inviteRole
-                    }
+                    value={inviteRole}
                     onChange={(event) =>
-                      setInviteRole(
-                        event.target
-                          .value
-                      )
+                      setInviteRole(event.target.value)
                     }
+                    required
+                    disabled={!inviteRoles.length || saving}
                   >
-                    <option value="ASOMAC_ADMIN">
-                      ASOMAC Administrator
+                    <option value="" disabled>
+                      {inviteRoles.length
+                        ? 'Select a role'
+                        : 'Loading roles...'}
                     </option>
 
-                    <option value="COMPANY_ADMIN">
-                      Company Administrator
-                    </option>
-
-                    <option value="BRANCH_ADMIN">
-                      Branch Administrator
-                    </option>
-
-                    <option value="FIELD_OPERATIVE">
-                      Field Operative
-                    </option>
+                    {inviteRoles.map((role) => (
+                      <option
+                        key={role.id}
+                        value={role.code}
+                      >
+                        {role.name}
+                      </option>
+                    ))}
                   </select>
 
                 </div>
@@ -1730,7 +1777,12 @@ export default function Users() {
                 <button
                   type="submit"
                   className="primary-button"
-                  disabled={saving}
+                  disabled={
+                    saving ||
+                    !inviteEmail.trim() ||
+                    !inviteRole ||
+                    !inviteRoles.some((role) => role.code === inviteRole)
+                  }
                 >
                   {saving
                     ? 'Preparing...'
