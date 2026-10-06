@@ -23,6 +23,7 @@ import LandingPage from './pages/LandingPage';
 import Admin from './pages/Admin';
 import CompanyPage from './pages/CompanyPage';
 import Users from './pages/Users';
+import AcceptInvitation from './pages/AcceptInvitation';
 
 import AppShell from './components/layout/AppShell';
 
@@ -447,6 +448,13 @@ export default function App() {
         path="/register"
         element={
           <Registration />
+        }
+      />
+
+      <Route
+        path="/accept-invitation"
+        element={
+          <AcceptInvitation />
         }
       />
 
