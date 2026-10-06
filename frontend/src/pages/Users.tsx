@@ -135,6 +135,18 @@ export default function Users() {
   const [inviteRoles, setInviteRoles] =
     useState<{ id: string; code: string; name: string; scope: string }[]>([]);
 
+  const [inviteCompanies, setInviteCompanies] =
+    useState<{ id: string; name: string }[]>([]);
+
+  const [inviteBranches, setInviteBranches] =
+    useState<{ id: string; company_id: string; name: string }[]>([]);
+
+  const [inviteCompanyId, setInviteCompanyId] =
+    useState('');
+
+  const [inviteBranchId, setInviteBranchId] =
+    useState('');
+
   const [generatedInvitation, setGeneratedInvitation] =
     useState<{ token: string; expiresAt: string; url: string } | null>(null);
 
@@ -171,6 +183,7 @@ export default function Users() {
   useEffect(() => {
     loadUsers();
     loadInviteRoles();
+    loadInviteCompanies();
   }, []);
 
   async function loadInviteRoles() {
@@ -209,6 +222,88 @@ export default function Users() {
 
       return availableRoles[0]?.code || '';
     });
+  }
+
+  async function loadInviteCompanies() {
+    const { data, error } = await supabase
+      .from('companies')
+      .select('id, name')
+      .order('name');
+
+    if (error) {
+      console.error(error);
+      setInviteCompanies([]);
+      setErrorMessage(
+        error.message || 'Unable to load companies for invitations.'
+      );
+      return;
+    }
+
+    setInviteCompanies(
+      (data || []) as { id: string; name: string }[]
+    );
+  }
+
+  async function loadInviteBranches(companyId: string) {
+    if (!companyId) {
+      setInviteBranches([]);
+      setInviteBranchId('');
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('branches')
+      .select('id, company_id, name')
+      .eq('company_id', companyId)
+      .order('name');
+
+    if (error) {
+      console.error(error);
+      setInviteBranches([]);
+      setInviteBranchId('');
+      setErrorMessage(
+        error.message || 'Unable to load branches for the selected company.'
+      );
+      return;
+    }
+
+    setInviteBranches(
+      (data || []) as { id: string; company_id: string; name: string }[]
+    );
+    setInviteBranchId('');
+  }
+
+  function selectedInviteRole() {
+    return inviteRoles.find((role) => role.code === inviteRole) || null;
+  }
+
+  function inviteRoleNeedsCompany() {
+    const scope = selectedInviteRole()?.scope?.toUpperCase();
+    return scope === 'COMPANY' || scope === 'BRANCH';
+  }
+
+  function inviteRoleNeedsBranch() {
+    return selectedInviteRole()?.scope?.toUpperCase() === 'BRANCH';
+  }
+
+  function handleInviteRoleChange(roleCode: string) {
+    setInviteRole(roleCode);
+
+    const role = inviteRoles.find((item) => item.code === roleCode);
+    const scope = role?.scope?.toUpperCase();
+
+    if (scope === 'BRANCH' || scope === 'COMPANY') {
+      setInviteCompanyId('');
+    } else {
+      setInviteCompanyId('');
+      setInviteBranchId('');
+      setInviteBranches([]);
+    }
+
+    if (scope !== 'BRANCH') {
+      setInviteBranchId('');
+      setInviteBranches([]);
+    }
   }
 
   const roles = useMemo(() => {
@@ -574,13 +669,50 @@ export default function Users() {
       return;
     }
 
+    const roleScope = selectedRole.scope?.toUpperCase();
+
+    if (roleScope === 'COMPANY' || roleScope === 'BRANCH') {
+      if (!inviteCompanyId) {
+        setErrorMessage(
+          'Please select the company this user will belong to.'
+        );
+        return;
+      }
+    }
+
+    if (roleScope === 'BRANCH') {
+      if (!inviteBranchId) {
+        setErrorMessage(
+          'Please select the branch this user will belong to.'
+        );
+        return;
+      }
+
+      const selectedBranch = inviteBranches.find(
+        (branch) => branch.id === inviteBranchId
+      );
+
+      if (!selectedBranch || selectedBranch.company_id !== inviteCompanyId) {
+        setErrorMessage(
+          'The selected branch does not belong to the selected company.'
+        );
+        return;
+      }
+    }
+
     setSaving(true);
 
     const { data, error } = await supabase.rpc('create_user_invitation', {
       p_email: email,
       p_role_id: selectedRole.id,
-      p_company_id: null,
-      p_branch_id: null,
+      p_company_id:
+        roleScope === 'COMPANY' || roleScope === 'BRANCH'
+          ? inviteCompanyId
+          : null,
+      p_branch_id:
+        roleScope === 'BRANCH'
+          ? inviteBranchId
+          : null,
       p_expires_in_hours: 168,
     });
 
@@ -1815,7 +1947,7 @@ export default function Users() {
                   <select
                     value={inviteRole}
                     onChange={(event) =>
-                      setInviteRole(event.target.value)
+                      handleInviteRoleChange(event.target.value)
                     }
                     required
                     disabled={!inviteRoles.length || saving}
@@ -1838,6 +1970,92 @@ export default function Users() {
 
                 </div>
 
+                {inviteRoleNeedsCompany() && (
+                  <div className="form-field">
+                    <label>
+                      Company *
+                    </label>
+
+                    <select
+                      value={inviteCompanyId}
+                      onChange={async (event) => {
+                        const companyId = event.target.value;
+                        setInviteCompanyId(companyId);
+                        setInviteBranchId('');
+
+                        if (inviteRoleNeedsBranch()) {
+                          await loadInviteBranches(companyId);
+                        } else {
+                          setInviteBranches([]);
+                        }
+                      }}
+                      required
+                      disabled={saving || !inviteCompanies.length}
+                    >
+                      <option value="">
+                        {inviteCompanies.length
+                          ? 'Select company'
+                          : 'No companies available'}
+                      </option>
+
+                      {inviteCompanies.map((company) => (
+                        <option
+                          key={company.id}
+                          value={company.id}
+                        >
+                          {company.name}
+                        </option>
+                      ))}
+                    </select>
+
+                    <small>
+                      This company assignment is enforced by the database.
+                    </small>
+                  </div>
+                )}
+
+                {inviteRoleNeedsBranch() && (
+                  <div className="form-field">
+                    <label>
+                      Branch *
+                    </label>
+
+                    <select
+                      value={inviteBranchId}
+                      onChange={(event) =>
+                        setInviteBranchId(event.target.value)
+                      }
+                      required
+                      disabled={
+                        saving ||
+                        !inviteCompanyId ||
+                        !inviteBranches.length
+                      }
+                    >
+                      <option value="">
+                        {!inviteCompanyId
+                          ? 'Select a company first'
+                          : inviteBranches.length
+                            ? 'Select branch'
+                            : 'No branches available'}
+                      </option>
+
+                      {inviteBranches.map((branch) => (
+                        <option
+                          key={branch.id}
+                          value={branch.id}
+                        >
+                          {branch.name}
+                        </option>
+                      ))}
+                    </select>
+
+                    <small>
+                      The branch must belong to the selected company.
+                    </small>
+                  </div>
+                )}
+
               </div>
 
               <div className="permission-notice">
@@ -1856,9 +2074,9 @@ export default function Users() {
                     through Supabase
                     authentication. The final
                     invitation RPC will enforce
-                    administrator permissions
-                    and role restrictions at the
-                    database level.
+                    administrator permissions,
+                    role scope and company/branch
+                    assignments at the database level.
                   </p>
                 </div>
 
@@ -1908,7 +2126,9 @@ export default function Users() {
                     emailChecking ||
                     emailCheck.status !== 'valid' ||
                     !inviteRole ||
-                    !inviteRoles.some((role) => role.code === inviteRole)
+                    !inviteRoles.some((role) => role.code === inviteRole) ||
+                    (inviteRoleNeedsCompany() && !inviteCompanyId) ||
+                    (inviteRoleNeedsBranch() && !inviteBranchId)
                   }
                 >
                   {saving
