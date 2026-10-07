@@ -1,10 +1,10 @@
 -- ASOMAC Phase 17: make platform administration operational for
 -- Super Administrators and ASOMAC Administrators.
 --
--- This migration fills the administrative RPCs used by the web application.
+-- This migration fills the system-administration RPCs used by the web application.
 -- Super Administrators retain unrestricted platform control.
--- ASOMAC Administrators can manage non-platform users, but cannot create,
--- modify, or delete SUPER_ADMIN / ASSOMAC_ADMIN accounts.
+-- ASOMAC Chairpersons do not use these system-wide user administration RPCs;
+-- their authority is limited to ASOMAC company information and company-level assignments.
 
 create or replace function public.admin_list_users()
 returns table (
