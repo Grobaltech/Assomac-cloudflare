@@ -225,6 +225,12 @@ export default function Companies() {
     setSelected(null);
     setForm({ ...EMPTY_FORM });
     setDirectors([]);
+    setCompanyAdministrators([]);
+    setCompanyAdminName('');
+    setCompanyAdminEmail('');
+    setCompanyAdminPhone('');
+    setCompanyAdminCountryCode('+256');
+    setCompanyAdminInviteLink('');
     setDirectorForm({ ...EMPTY_DIRECTOR });
     setEditingDirectorId(null);
     setMessage('');
