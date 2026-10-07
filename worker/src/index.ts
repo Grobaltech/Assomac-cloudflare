@@ -7,4 +7,65 @@ async function rpc(env:Env,name:string,args:any,t:string){const r=await fetch(en
 const esc=(v:string)=>v.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;');
 async function emailCheck(e:string){const d=e.split('@')[1]?.toLowerCase();if(!d)return{valid:false,reason:'Enter a valid email address.'};try{const r=await fetch('https://cloudflare-dns.com/dns-query?name='+encodeURIComponent(d)+'&type=MX',{headers:{Accept:'application/dns-json'}});if(!r.ok)return{valid:true,message:'Email format is valid. Mail-server verification is temporarily unavailable.'};const x:any=await r.json();return Array.isArray(x.Answer)&&x.Answer.length?{valid:true,message:'Email address and mail server verified.'}:{valid:false,reason:'This email domain does not appear to have a mail server (MX record).'};}catch{return{valid:true,message:'Email format is valid. Mail-server verification is temporarily unavailable.'}}}
 async function send(env:Env,to:string,role:string,company:string|null,branch:string|null,expires:string,url:string){if(!env.RESEND_API_KEY||!env.INVITATION_FROM_EMAIL)throw Error('Email delivery is not configured on the ASOMAC Cloudflare Worker. The invitation was created successfully and the secure link is available to copy.');const scope=(company?'<li><b>Company:</b> '+esc(company)+'</li>':'')+(branch?'<li><b>Branch:</b> '+esc(branch)+'</li>':'');const r=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:'Bearer '+env.RESEND_API_KEY,'Content-Type':'application/json'},body:JSON.stringify({from:env.INVITATION_FROM_EMAIL,to:[to],subject:'Your ASOMAC invitation',html:'<div style="font-family:Arial,sans-serif;max-width:620px;margin:auto;color:#1f2b3d"><div style="background:#00194C;padding:24px;color:white;border-radius:16px 16px 0 0"><b>ASOMAC</b><h1>You have been invited</h1></div><div style="padding:26px;background:#f7f9fc"><p>You have been invited to create your ASOMAC account.</p><ul><li><b>Role:</b> '+esc(role)+'</li>'+scope+'<li><b>Expires:</b> '+esc(new Date(expires).toLocaleString())+'</li></ul><p><a href="'+esc(url)+'" style="display:inline-block;background:#f35a02;color:white;text-decoration:none;padding:13px 20px;border-radius:10px;font-weight:700">Accept ASOMAC Invitation</a></p><p style="font-size:12px;color:#6d7889">If the button does not work, copy this link:<br>'+esc(url)+'</p><p style="font-size:12px;color:#6d7889">You will create your account and verify your email before the invitation is activated.</p></div></div>'})});const x=await r.text();if(!r.ok){let b:any;try{b=JSON.parse(x)}catch{b=null}throw Error(b?.message||b?.error||'The email provider rejected the invitation email.');}}
-export default {async fetch(req:Request,env:Env){const u=new URL(req.url);if(req.method==='OPTIONS')return new Response(null,{headers:C});if(u.pathname==='/'||u.pathname==='/health')return j({service:'ASSOMAC API',status:'ready',routes:['/api/email/check','/api/invitations/send']});try{const t=bearer(req);if(u.pathname==='/api/email/check'&&req.method==='POST'){await user(env,t);const b:any=await req.json();const e=String(b?.email||'').trim().toLowerCase();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))return j({valid:false,reason:'Enter a valid email address.'},400);return j(await emailCheck(e));}if(u.pathname==='/api/invitations/send'&&req.method==='POST'){await user(env,t);const b:any=await req.json();const id=String(b?.invitation_id||''),token=String(b?.invitation_token||'');if(!id||!token)return j({error:'Invitation ID and invitation token are required.'},400);const p=await rpc(env,'prepare_user_invitation_email',{p_invitation_id:id,p_invitation_token:token},t);const i=Array.isArray(p)?p[0]:p;if(!i)return j({error:'Invitation could not be prepared for delivery.'},400);const app=(env.APP_URL||req.headers.get('Origin')||'').replace(/\/$/,'');if(!app)return j({error:'ASOMAC application URL is not configured on the Worker.'},500);const link=app+'/accept-invitation?token='+encodeURIComponent(token);await send(env,i.email,i.role_name,i.company_name,i.branch_name,i.expires_at,link);await rpc(env,'mark_user_invitation_email_sent',{p_invitation_id:id},t);return j({sent:true,message:'Invitation email sent successfully.'});}return j({error:'Route not found.'},404);}catch(e){console.error(e);return j({error:e instanceof Error?e.message:'Unexpected server error.'},400);}}};
+export default {async fetch(req:Request,env:Env){const u=new URL(req.url);if(req.method==='OPTIONS')return new Response(null,{headers:C});if(u.pathname==='/'||u.pathname==='/health')return j({service:'ASSOMAC API',status:'ready',routes:['/api/email/check','/api/invitations/send','/api/admin/users/create']});try{const t=bearer(req);if(u.pathname==='/api/email/check'&&req.method==='POST'){await user(env,t);const b:any=await req.json();const e=String(b?.email||'').trim().toLowerCase();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))return j({valid:false,reason:'Enter a valid email address.'},400);return j(await emailCheck(e));}if(u.pathname==='/api/admin/users/create'&&req.method==='POST'){
+  await rpc(env,'admin_list_users',{},t);
+  const b:any=await req.json();
+  const email=String(b?.email||'').trim().toLowerCase();
+  const fullName=String(b?.full_name||'').trim();
+  const phone=String(b?.phone||'').trim();
+  const countryCode=String(b?.country_code||'+256').trim();
+  const password=String(b?.password||'');
+  const roleId=String(b?.role_id||'');
+  const companyId=b?.company_id?String(b.company_id):null;
+  const branchId=b?.branch_id?String(b.branch_id):null;
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return j({error:'Enter a valid email address.'},400);
+  if(!fullName)return j({error:'Full name is required.'},400);
+  if(!/^\\+\\d{8,15}$/.test(phone))return j({error:'Enter a valid international phone number.'},400);
+  if(password.length<8)return j({error:'Password must contain at least 8 characters.'},400);
+  if(!roleId)return j({error:'A role is required.'},400);
+
+  const create=await fetch(env.SUPABASE_URL+'/auth/v1/admin/users',{
+    method:'POST',
+    headers:{apikey:env.SUPABASE_SERVICE_ROLE_KEY,Authorization:'Bearer '+env.SUPABASE_SERVICE_ROLE_KEY,'Content-Type':'application/json'},
+    body:JSON.stringify({
+      email,
+      password,
+      email_confirm:true,
+      phone,
+      phone_confirm:false,
+      user_metadata:{full_name:fullName}
+    })
+  });
+  const createText=await create.text();
+  let created:any; try{created=createText?JSON.parse(createText):null}catch{created=null}
+  if(!create.ok){
+    return j({error:created?.msg||created?.message||created?.error_description||'Unable to create the authentication user.'},400);
+  }
+
+  try{
+    await rpc(env,'admin_register_auth_user',{
+      p_user_id:created.id,
+      p_email:email,
+      p_full_name:fullName,
+      p_phone:phone,
+      p_country_code:countryCode,
+      p_role_id:roleId,
+      p_company_id:companyId,
+      p_branch_id:branchId
+    },t);
+  }catch(e){
+    await fetch(env.SUPABASE_URL+'/auth/v1/admin/users/'+encodeURIComponent(created.id),{
+      method:'DELETE',
+      headers:{apikey:env.SUPABASE_SERVICE_ROLE_KEY,Authorization:'Bearer '+env.SUPABASE_SERVICE_ROLE_KEY}
+    });
+    throw e;
+  }
+
+  return j({
+    created:true,
+    user_id:created.id,
+    email,
+    message:'User created successfully. The email is confirmed by the administrator; phone verification remains pending.'
+  });
+}
+if(u.pathname==='/api/invitations/send'&&req.method==='POST'){await user(env,t);const b:any=await req.json();const id=String(b?.invitation_id||''),token=String(b?.invitation_token||'');if(!id||!token)return j({error:'Invitation ID and invitation token are required.'},400);const p=await rpc(env,'prepare_user_invitation_email',{p_invitation_id:id,p_invitation_token:token},t);const i=Array.isArray(p)?p[0]:p;if(!i)return j({error:'Invitation could not be prepared for delivery.'},400);const app=(env.APP_URL||req.headers.get('Origin')||'').replace(/\/$/,'');if(!app)return j({error:'ASOMAC application URL is not configured on the Worker.'},500);const link=app+'/accept-invitation?token='+encodeURIComponent(token);await send(env,i.email,i.role_name,i.company_name,i.branch_name,i.expires_at,link);await rpc(env,'mark_user_invitation_email_sent',{p_invitation_id:id},t);return j({sent:true,message:'Invitation email sent successfully.'});}return j({error:'Route not found.'},404);}catch(e){console.error(e);return j({error:e instanceof Error?e.message:'Unexpected server error.'},400);}}};
