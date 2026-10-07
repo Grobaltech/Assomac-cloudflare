@@ -24,6 +24,16 @@ type Company = {
   created_at: string;
 };
 
+type CompanyAdministrator = {
+  user_id: string;
+  email: string | null;
+  full_name: string | null;
+  phone: string | null;
+  status: string;
+  assigned_at: string | null;
+  role_ended_at: string | null;
+};
+
 type Director = {
   id: string;
   company_id: string;
@@ -88,6 +98,14 @@ export default function Companies() {
   const [editingDirectorId, setEditingDirectorId] = useState<string | null>(null);
   const [loadingDirectors, setLoadingDirectors] = useState(false);
   const [savingDirector, setSavingDirector] = useState(false);
+  const [companyAdministrators, setCompanyAdministrators] = useState<CompanyAdministrator[]>([]);
+  const [loadingCompanyAdministrators, setLoadingCompanyAdministrators] = useState(false);
+  const [companyAdminEmail, setCompanyAdminEmail] = useState('');
+  const [companyAdminName, setCompanyAdminName] = useState('');
+  const [companyAdminPhone, setCompanyAdminPhone] = useState('');
+  const [companyAdminCountryCode, setCompanyAdminCountryCode] = useState('+256');
+  const [assigningCompanyAdmin, setAssigningCompanyAdmin] = useState(false);
+  const [companyAdminInviteLink, setCompanyAdminInviteLink] = useState('');
 
   async function loadCompanies() {
     setLoading(true);
@@ -131,6 +149,59 @@ export default function Companies() {
     loadCompanies();
     loadPermissions();
   }, []);
+
+  async function loadCompanyAdministrators(companyId: string) {
+    setLoadingCompanyAdministrators(true);
+    const { data, error } = await supabase.rpc('list_company_administrators', {
+      p_company_id: companyId,
+    });
+    if (error) {
+      setCompanyAdministrators([]);
+      setError(error.message || 'Unable to load company users.');
+    } else {
+      setCompanyAdministrators((data || []) as CompanyAdministrator[]);
+    }
+    setLoadingCompanyAdministrators(false);
+  }
+
+  async function assignCompanyChairperson() {
+    if (!selected) return;
+    if (!companyAdminName.trim() || !companyAdminEmail.trim() || !companyAdminPhone.trim()) {
+      setError('Company Chairperson name, email and phone are required.');
+      return;
+    }
+
+    setAssigningCompanyAdmin(true);
+    setError('');
+    setMessage('');
+    setCompanyAdminInviteLink('');
+
+    const { data, error } = await supabase.rpc('create_company_admin_invitation', {
+      p_company_id: selected.id,
+      p_email: companyAdminEmail.trim().toLowerCase(),
+      p_full_name: companyAdminName.trim(),
+      p_phone: companyAdminPhone.trim(),
+      p_country_code: companyAdminCountryCode,
+      p_expires_in_hours: 168,
+    });
+
+    if (error) {
+      setError(error.message || 'Unable to assign Company Chairperson.');
+    } else {
+      const result = Array.isArray(data) ? data[0] : data;
+      if (result?.invitation_token) {
+        const link = `${window.location.origin}/accept-invitation?token=${encodeURIComponent(result.invitation_token)}`;
+        setCompanyAdminInviteLink(link);
+      }
+      setMessage('Company Chairperson invitation created successfully.');
+      setCompanyAdminEmail('');
+      setCompanyAdminName('');
+      setCompanyAdminPhone('');
+      await loadCompanyAdministrators(selected.id);
+    }
+
+    setAssigningCompanyAdmin(false);
+  }
 
   async function loadDirectors(companyId: string) {
     setLoadingDirectors(true);
@@ -186,7 +257,7 @@ export default function Companies() {
     setMessage('');
     setError('');
     setShowForm(true);
-    await loadDirectors(company.id);
+    await Promise.all([loadDirectors(company.id), loadCompanyAdministrators(company.id)]);
   }
 
   function closeForm() {
@@ -194,6 +265,8 @@ export default function Companies() {
     setShowForm(false);
     setSelected(null);
     setDirectors([]);
+    setCompanyAdministrators([]);
+    setCompanyAdminInviteLink('');
     setEditingDirectorId(null);
   }
 
@@ -582,6 +655,82 @@ export default function Companies() {
                   </button>
                 </div>
               </form>
+
+              <div className="mt-8 pt-8 border-t border-slate-200">
+                <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+                  <div>
+                    <h3 className="font-black text-[#00194C] text-lg">Company Leadership & Users</h3>
+                    <p className="text-sm text-slate-500 mt-1">
+                      Assign the Company Chairperson and maintain company-level access. The Chairperson will receive a secure invitation.
+                    </p>
+                  </div>
+                </div>
+
+                {selected && (
+                  <>
+                    <div className="grid md:grid-cols-4 gap-3 mt-5 rounded-2xl bg-slate-50 p-4">
+                      <input className="rounded-xl border border-slate-200 px-3 py-3" placeholder="Full name" value={companyAdminName} onChange={(e) => setCompanyAdminName(e.target.value)} />
+                      <input className="rounded-xl border border-slate-200 px-3 py-3" type="email" placeholder="Email" value={companyAdminEmail} onChange={(e) => setCompanyAdminEmail(e.target.value)} />
+                      <div className="flex gap-2">
+                        <select className="rounded-xl border border-slate-200 px-2 py-3 bg-white" value={companyAdminCountryCode} onChange={(e) => setCompanyAdminCountryCode(e.target.value)}>
+                          <option value="+256">+256 UG</option>
+                          <option value="+254">+254 KE</option>
+                          <option value="+255">+255 TZ</option>
+                          <option value="+250">+250 RW</option>
+                        </select>
+                        <input className="min-w-0 flex-1 rounded-xl border border-slate-200 px-3 py-3" placeholder="Phone" value={companyAdminPhone} onChange={(e) => setCompanyAdminPhone(e.target.value)} />
+                      </div>
+                      <button type="button" onClick={assignCompanyChairperson} disabled={assigningCompanyAdmin} className="primary-button">
+                        {assigningCompanyAdmin ? 'Creating…' : 'Assign Company Chairperson'}
+                      </button>
+                    </div>
+
+                    {companyAdminInviteLink && (
+                      <div className="mt-3 rounded-xl bg-green-50 border border-green-200 p-3">
+                        <p className="text-xs font-bold text-green-800">Secure invitation link</p>
+                        <div className="mt-2 flex gap-2">
+                          <input readOnly value={companyAdminInviteLink} className="min-w-0 flex-1 rounded-lg border border-green-200 bg-white px-3 py-2 text-xs" />
+                          <button type="button" onClick={() => navigator.clipboard?.writeText(companyAdminInviteLink)} className="rounded-lg bg-green-700 text-white px-3 py-2 text-xs font-bold">Copy</button>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="mt-5">
+                      {loadingCompanyAdministrators ? (
+                        <p className="py-5 text-sm text-slate-500">Loading company users…</p>
+                      ) : companyAdministrators.length === 0 ? (
+                        <p className="py-5 text-sm text-slate-400">No company-level users assigned yet.</p>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead className="border-b border-slate-200 text-left">
+                              <tr>
+                                <th className="py-3 pr-4">User</th>
+                                <th className="py-3 pr-4">Phone</th>
+                                <th className="py-3 pr-4">Status</th>
+                                <th className="py-3">Assigned</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {companyAdministrators.map((user) => (
+                                <tr key={user.user_id} className="border-b border-slate-100">
+                                  <td className="py-3 pr-4">
+                                    <div className="font-bold text-[#00194C]">{user.full_name || 'Unnamed user'}</div>
+                                    <div className="text-xs text-slate-500">{user.email || '—'}</div>
+                                  </td>
+                                  <td className="py-3 pr-4">{user.phone || '—'}</td>
+                                  <td className="py-3 pr-4">{labelStatus(user.status)}</td>
+                                  <td className="py-3">{user.assigned_at ? new Date(user.assigned_at).toLocaleDateString() : '—'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
 
               <div className="mt-8 pt-8 border-t border-slate-200">
                 <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
