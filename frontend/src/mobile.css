@@ -283,3 +283,6 @@ button,
     padding: 24px 16px;
   }
 }
+
+.install-app-button{min-height:40px;padding:0 13px;border:0;border-radius:10px;background:#f35a02;color:#fff;font-weight:800;font-size:12px;cursor:pointer;white-space:nowrap;}
+@media(max-width:600px){.install-app-button{font-size:11px;padding:0 10px;}.topbar-divider{display:none;}}
