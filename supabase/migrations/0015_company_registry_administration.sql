@@ -377,7 +377,15 @@ create policy branches_read on public.branches for select using (
         and c.allow_asomac_branch_visibility=true
     )
   )
-  or public.has_company_management_access(company_id)
+  or exists (
+    select 1
+    from public.user_roles ur
+    join public.roles r on r.id=ur.role_id
+    where ur.user_id=auth.uid()
+      and ur.company_id=company_id
+      and ur.ended_at is null
+      and r.code in ('COMPANY_ADMIN','COMPANY_DIRECTOR')
+  )
   or public.has_branch_access(id)
 );
 
