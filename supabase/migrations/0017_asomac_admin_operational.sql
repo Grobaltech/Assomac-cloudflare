@@ -31,8 +31,8 @@ as $$
 declare
   v_uid uuid := auth.uid();
 begin
-  if v_uid is null or not public.is_asomac_admin() then
-    raise exception 'Platform administration access required';
+  if v_uid is null or not public.is_super_admin() then
+    raise exception 'Super Administrator access required';
   end if;
 
   return query
@@ -89,8 +89,8 @@ declare
   v_target_platform boolean;
   v_old jsonb;
 begin
-  if v_actor is null or not public.is_asomac_admin() then
-    raise exception 'Platform administration access required';
+  if v_actor is null or not public.is_super_admin() then
+    raise exception 'Super Administrator access required';
   end if;
 
   if p_user_id is null then
@@ -173,8 +173,8 @@ declare
   v_old jsonb;
   v_branch_company uuid;
 begin
-  if v_actor is null or not public.is_asomac_admin() then
-    raise exception 'Platform administration access required';
+  if v_actor is null or not public.is_super_admin() then
+    raise exception 'Super Administrator access required';
   end if;
 
   if p_user_id is null or p_role_id is null then
@@ -305,8 +305,8 @@ declare
   v_target_platform boolean;
   v_super_count integer;
 begin
-  if v_actor is null or not public.is_asomac_admin() then
-    raise exception 'Platform administration access required';
+  if v_actor is null or not public.is_super_admin() then
+    raise exception 'Super Administrator access required';
   end if;
 
   if p_user_id is null then
