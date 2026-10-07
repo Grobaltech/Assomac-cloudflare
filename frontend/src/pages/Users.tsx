@@ -21,6 +21,34 @@ type AdminUser = {
 
 type ModalMode = 'view' | 'edit';
 
+const PHONE_COUNTRY_CODES = [
+  { code: '+256', name: 'Uganda' },
+  { code: '+254', name: 'Kenya' },
+  { code: '+255', name: 'Tanzania' },
+  { code: '+250', name: 'Rwanda' },
+  { code: '+257', name: 'Burundi' },
+  { code: '+211', name: 'South Sudan' },
+  { code: '+243', name: 'DR Congo' },
+  { code: '+234', name: 'Nigeria' },
+  { code: '+233', name: 'Ghana' },
+  { code: '+27', name: 'South Africa' },
+  { code: '+44', name: 'United Kingdom' },
+  { code: '+1', name: 'United States / Canada' },
+  { code: '+971', name: 'United Arab Emirates' },
+];
+
+const EMAIL_DOMAINS = [
+  'gmail.com',
+  'outlook.com',
+  'hotmail.com',
+  'yahoo.com',
+  'icloud.com',
+  'proton.me',
+  'protonmail.com',
+  'zoho.com',
+  'company domain',
+];
+
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
 
@@ -128,6 +156,14 @@ export default function Users() {
 
   const [inviteEmail, setInviteEmail] =
     useState('');
+  const [inviteEmailLocal, setInviteEmailLocal] =
+    useState('');
+  const [inviteEmailDomain, setInviteEmailDomain] =
+    useState('gmail.com');
+  const [inviteCustomEmailDomain, setInviteCustomEmailDomain] =
+    useState('');
+  const [inviteCountryCode, setInviteCountryCode] =
+    useState('+256');
 
   const [emailChecking, setEmailChecking] =
     useState(false);
@@ -145,6 +181,8 @@ export default function Users() {
     useState('');
 
   const [invitePhone, setInvitePhone] =
+    useState('');
+  const [invitePhoneLocal, setInvitePhoneLocal] =
     useState('');
 
   const [inviteRole, setInviteRole] =
@@ -764,7 +802,7 @@ export default function Users() {
   }
 
   async function checkInviteEmail(showSuccess = true): Promise<boolean> {
-    const email = inviteEmail.trim().toLowerCase();
+    const { email, phone } = composeInviteContact();
 
     if (!email) {
       setEmailCheck({
@@ -848,6 +886,23 @@ export default function Users() {
 
   const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || 'https://assomac-api.grobaltechtechnologies.workers.dev').replace(/\/$/, '');
 
+  function composeInviteContact() {
+    const local = inviteEmailLocal.trim().replace(/^@+/, '');
+    const domain =
+      inviteEmailDomain === 'company domain'
+        ? inviteCustomEmailDomain.trim().toLowerCase().replace(/^@+/, '')
+        : inviteEmailDomain.trim().toLowerCase();
+
+    const email = local && domain ? `${local}@${domain}` : inviteEmail.trim().toLowerCase();
+
+    const phoneDigits = invitePhoneLocal.replace(/\D/g, '');
+    const phone = phoneDigits
+      ? `${inviteCountryCode}${phoneDigits.replace(/^0+/, '')}`
+      : invitePhone.trim();
+
+    return { email, phone };
+  }
+
   async function submitInvitation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage('');
@@ -863,6 +918,11 @@ export default function Users() {
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setErrorMessage('Please enter a valid email address.');
+      return;
+    }
+
+    if (!/^\+\d{8,15}$/.test(phone)) {
+      setErrorMessage('Enter a valid phone number with the selected country code.');
       return;
     }
 
@@ -923,8 +983,11 @@ export default function Users() {
     setMessage('Creating the secure invitation...');
     setErrorMessage('');
 
-    const { data, error } = await supabase.rpc('create_user_invitation', {
+    const { data, error } = await supabase.rpc('create_user_invitation_v2', {
       p_email: email,
+      p_full_name: inviteName.trim() || null,
+      p_phone: phone,
+      p_country_code: inviteCountryCode,
       p_role_id: selectedRole.id,
       p_company_id:
         roleScope === 'COMPANY' || roleScope === 'BRANCH'
@@ -1040,7 +1103,19 @@ export default function Users() {
           type="button"
           className="primary-button"
           onClick={() =>
-            setShowInviteModal(true)
+            setInviteEmail('');
+                  setInviteEmailLocal('');
+                  setInviteEmailDomain('gmail.com');
+                  setInviteCustomEmailDomain('');
+                  setInvitePhone('');
+                  setInvitePhoneLocal('');
+                  setInviteCountryCode('+256');
+                  setInviteName('');
+                  setEmailCheck({ status: 'idle', message: '' });
+                  setGeneratedInvitation(null);
+                  setMessage('');
+                  setErrorMessage('');
+                  setShowInviteModal(true)
           }
         >
           <span className="button-icon">
@@ -2216,25 +2291,56 @@ export default function Users() {
                     Email Address *
                   </label>
 
-                  <input
-                    type="email"
-                    value={inviteEmail}
-                    onChange={(event) => {
-                      setInviteEmail(event.target.value);
-                      setEmailCheck({
-                        status: 'idle',
-                        message: '',
-                      });
-                    }}
-                    onBlur={() => {
-                      if (inviteEmail.trim()) {
-                        void checkInviteEmail();
-                      }
-                    }}
-                    placeholder="name@example.com"
-                    required
-                    disabled={saving || emailChecking}
-                  />
+                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(150px, .7fr)', gap: 8 }}>
+                    <input
+                      type="text"
+                      value={inviteEmailLocal}
+                      onChange={(event) => {
+                        const local = event.target.value.replace(/\s/g, '').replace(/@.*/, '');
+                        setInviteEmailLocal(local);
+                        setInviteEmail(local && inviteEmailDomain !== 'company domain'
+                          ? `${local}@${inviteEmailDomain}`
+                          : local);
+                        setEmailCheck({ status: 'idle', message: '' });
+                      }}
+                      placeholder="name"
+                      required
+                      disabled={saving || emailChecking}
+                    />
+                    <select
+                      value={inviteEmailDomain}
+                      onChange={(event) => {
+                        const domain = event.target.value;
+                        setInviteEmailDomain(domain);
+                        setInviteEmail(
+                          inviteEmailLocal && domain !== 'company domain'
+                            ? `${inviteEmailLocal}@${domain}`
+                            : inviteEmailLocal
+                        );
+                        setEmailCheck({ status: 'idle', message: '' });
+                      }}
+                      disabled={saving || emailChecking}
+                    >
+                      {EMAIL_DOMAINS.map((domain) => (
+                        <option key={domain} value={domain}>{domain === 'company domain' ? 'Custom domain…' : `@${domain}`}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {inviteEmailDomain === 'company domain' && (
+                    <input
+                      type="text"
+                      value={inviteCustomEmailDomain}
+                      onChange={(event) => {
+                        const domain = event.target.value.toLowerCase().replace(/\s/g, '').replace(/^@+/, '');
+                        setInviteCustomEmailDomain(domain);
+                        setInviteEmail(inviteEmailLocal && domain ? `${inviteEmailLocal}@${domain}` : inviteEmailLocal);
+                        setEmailCheck({ status: 'idle', message: '' });
+                      }}
+                      placeholder="yourcompany.com"
+                      required
+                      disabled={saving || emailChecking}
+                    />
+                  )}
 
                   {emailCheck.message && (
                     <small
@@ -2261,18 +2367,31 @@ export default function Users() {
                     Phone Number
                   </label>
 
-                  <input
-                    value={
-                      invitePhone
-                    }
-                    onChange={(event) =>
-                      setInvitePhone(
-                        event.target
-                          .value
-                      )
-                    }
-                    placeholder="+256..."
-                  />
+                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(145px, .75fr) minmax(0, 1fr)', gap: 8 }}>
+                    <select
+                      value={inviteCountryCode}
+                      onChange={(event) => setInviteCountryCode(event.target.value)}
+                      disabled={saving}
+                      required
+                    >
+                      {PHONE_COUNTRY_CODES.map((country) => (
+                        <option key={country.code} value={country.code}>{country.name} ({country.code})</option>
+                      ))}
+                    </select>
+                    <input
+                      value={invitePhoneLocal}
+                      onChange={(event) => {
+                        const digits = event.target.value.replace(/\D/g, '').replace(/^0+/, '');
+                        setInvitePhoneLocal(digits);
+                        setInvitePhone(`${inviteCountryCode}${digits}`);
+                      }}
+                      placeholder="700123456"
+                      inputMode="numeric"
+                      required
+                      disabled={saving}
+                    />
+                  </div>
+                  <small>Phone is stored in international format and will be used for OTP verification.</small>
 
                 </div>
 
