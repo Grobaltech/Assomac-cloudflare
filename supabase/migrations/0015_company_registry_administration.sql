@@ -416,3 +416,37 @@ create policy branches_read on public.branches for select using (
 
 -- Branch writes are intentionally not opened here.
 -- They will be enabled for Company Administrators in the next hierarchy phase.
+
+
+-- Company administrator assignment.
+create or replace function public.create_company_admin_invitation(
+  p_company_id uuid, p_email text, p_full_name text, p_phone text,
+  p_country_code text default '+256', p_expires_in_hours integer default 168
+)
+returns table(invitation_id uuid, invitation_token text, expires_at timestamptz)
+language plpgsql security definer set search_path=public,extensions
+as $$
+declare v_role_id uuid;
+begin
+  if not public.is_asomac_admin() then raise exception 'ASOMAC administration required'; end if;
+  if not exists(select 1 from public.companies where id=p_company_id) then raise exception 'Company not found'; end if;
+  select id into v_role_id from public.roles where code='COMPANY_ADMIN';
+  if v_role_id is null then raise exception 'Role not configured'; end if;
+  return query select * from public.create_user_invitation_v2(
+    p_email,p_full_name,p_phone,p_country_code,v_role_id,p_company_id,null,p_expires_in_hours
+  );
+end;
+$$;
+
+create or replace function public.list_company_administrators(p_company_id uuid)
+returns table(user_id uuid,email text,full_name text,phone text,status public.record_status,assigned_at timestamptz,role_ended_at timestamptz)
+language sql security definer set search_path=public
+as $$
+ select p.id,p.email,p.full_name,p.phone,p.status,ur.assigned_at,ur.ended_at
+ from public.user_roles ur join public.roles r on r.id=ur.role_id join public.profiles p on p.id=ur.user_id
+ where ur.company_id=p_company_id and r.code='COMPANY_ADMIN'
+ order by ur.ended_at nulls first,p.full_name;
+$$;
+
+grant execute on function public.create_company_admin_invitation(uuid,text,text,text,text,integer) to authenticated;
+grant execute on function public.list_company_administrators(uuid) to authenticated;
