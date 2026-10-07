@@ -1211,7 +1211,7 @@ export default function Users() {
             setInvitePhoneLocal('');
             setInviteCountryCode('+256');
             setInviteName('');
-            setInviteRole(inviteRoles[0]?.code || '');
+            setInviteRole('');
             setInviteCompanyId('');
             setInviteBranchId('');
             setInviteBranches([]);
