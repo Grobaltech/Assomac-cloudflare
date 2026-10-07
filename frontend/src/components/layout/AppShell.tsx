@@ -202,6 +202,8 @@ export default function AppShell({ children }: AppShellProps) {
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [installed, setInstalled] = useState(false);
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [role, setRole] = useState<UserRole | null>(null);
@@ -303,6 +305,12 @@ export default function AppShell({ children }: AppShellProps) {
         role_name: roleInfo.name,
       });
     }
+  }
+
+  async function installApp() {
+    if (!installPrompt) return;
+    await installPrompt.prompt();
+    setInstallPrompt(null);
   }
 
   async function logout() {
