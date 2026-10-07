@@ -17,6 +17,7 @@ import { supabase } from './lib/supabase';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Companies from './pages/Companies';
+import Branches from './pages/Branches';
 import Transfers from './pages/Transfers';
 import HistoricalEntry from './pages/HistoricalEntry';
 import LandingPage from './pages/LandingPage';
@@ -549,10 +550,7 @@ export default function App() {
         path="/branches"
         element={
           <Protected>
-            <PlaceholderPage
-              title="Branches"
-              description="Branch information will be available according to company authorization and user permissions."
-            />
+            <Branches />
           </Protected>
         }
       />
