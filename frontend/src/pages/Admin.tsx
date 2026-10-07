@@ -27,6 +27,95 @@ type Section =
   | 'audit'
   | 'settings';
 
+
+function AsomacChairpersonPanel() {
+  const [companyCount, setCompanyCount] = useState(0);
+  const [activeCompanies, setActiveCompanies] = useState(0);
+  const [pendingCompanies, setPendingCompanies] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      const { data, error } = await supabase
+        .from('companies')
+        .select('id,status,membership_status');
+
+      if (!error) {
+        const rows = data || [];
+        setCompanyCount(rows.length);
+        setActiveCompanies(rows.filter((x: any) => x.status === 'ACTIVE').length);
+        setPendingCompanies(rows.filter((x: any) => x.membership_status === 'PENDING').length);
+      }
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  return (
+    <div className="space-y-6">
+      <section className="rounded-3xl bg-[#00194C] text-white p-7 md:p-9 shadow-xl">
+        <p className="text-[#f35a02] text-xs font-black tracking-[0.2em]">
+          ASOMAC CHAIRPERSON
+        </p>
+        <h1 className="text-3xl md:text-4xl font-black mt-2">
+          ASOMAC Administration
+        </h1>
+        <p className="text-blue-100 mt-3 max-w-2xl">
+          Manage ASOMAC company information, register member companies and assign company-level users.
+          System administration remains exclusively with the Super Administrator.
+        </p>
+      </section>
+
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        <StatCard label="Registered Companies" value={loading ? '…' : companyCount} description="Companies in the ASOMAC registry" icon="▦" />
+        <StatCard label="Active Companies" value={loading ? '…' : activeCompanies} description="Currently active companies" icon="✓" />
+        <StatCard label="Pending Memberships" value={loading ? '…' : pendingCompanies} description="Companies awaiting membership action" icon="◷" />
+      </div>
+
+      <section className="card p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <p className="text-[#f35a02] font-bold text-sm">COMPANY MANAGEMENT</p>
+            <h2 className="text-2xl font-black text-[#00194C] mt-1">ASOMAC Company Registry</h2>
+            <p className="text-slate-500 mt-2">
+              Register companies, maintain their official information, manage membership records and assign company users.
+            </p>
+          </div>
+          <Link
+            to="/companies"
+            className="inline-flex items-center justify-center rounded-xl bg-[#f35a02] text-white px-5 py-3 font-black hover:opacity-90"
+          >
+            + Register / Manage Companies
+          </Link>
+        </div>
+      </section>
+
+      <section className="card p-6">
+        <h2 className="text-lg font-black text-[#00194C]">Your authority</h2>
+        <div className="grid md:grid-cols-2 gap-3 mt-4">
+          <ScopeItem yes text="Register and edit company information" />
+          <ScopeItem yes text="Maintain ASOMAC membership records" />
+          <ScopeItem yes text="Assign company-level users" />
+          <ScopeItem yes text="Maintain company leadership information" />
+          <ScopeItem text="View or edit Super Administrator accounts" />
+          <ScopeItem text="Change system-wide security or configuration" />
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function ScopeItem({ yes = false, text }: { yes?: boolean; text: string }) {
+  return (
+    <div className="rounded-xl border border-slate-200 p-3 flex items-center gap-3">
+      <span className={yes ? 'text-green-600 font-black' : 'text-red-500 font-black'}>
+        {yes ? '✓' : '×'}
+      </span>
+      <span className="text-sm font-bold text-slate-700">{text}</span>
+    </div>
+  );
+}
+
 export default function Admin() {
   const [section, setSection] = useState<Section>('overview');
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -215,7 +304,7 @@ export default function Admin() {
     );
   }
 
-  if (currentRole !== 'SUPER_ADMIN' && currentRole !== 'ASSOMAC_ADMIN') {
+  if (currentRole === 'ASSOMAC_ADMIN') {\n    return <AsomacChairpersonPanel />;\n  }\n\n  if (currentRole !== 'SUPER_ADMIN') {
     return (
       <div className="card p-8 text-center">
         <h1 className="text-2xl font-black text-[#00194C]">Administration access required</h1>
@@ -335,7 +424,7 @@ export default function Admin() {
             </h2>
 
             <p className="text-slate-500 mt-2">
-              A platform-wide view of the current system.
+              A complete system-wide view for the Super Administrator.
             </p>
           </div>
 
