@@ -209,6 +209,8 @@ export default function AppShell({ children }: AppShellProps) {
   const [role, setRole] = useState<UserRole | null>(null);
 
   const isSuperAdmin = role?.role_code === 'SUPER_ADMIN';
+  const isAsomacAdmin = role?.role_code === 'ASSOMAC_ADMIN';
+  const isPlatformAdmin = isSuperAdmin || isAsomacAdmin;
 
   const profileRef = useRef<HTMLDivElement | null>(null);
 
@@ -344,7 +346,7 @@ export default function AppShell({ children }: AppShellProps) {
       path: '/users',
       icon: 'users',
     },
-    ...(isSuperAdmin
+    ...(isPlatformAdmin
       ? [{
           label: 'Sent Invitations',
           path: '/sent-invitations',
@@ -424,22 +426,26 @@ export default function AppShell({ children }: AppShellProps) {
           })}
         </nav>
 
-        <div className="sidebar-section-title administration-title">
-          SYSTEM
-        </div>
+        {isPlatformAdmin && (
+          <>
+            <div className="sidebar-section-title administration-title">
+              SYSTEM
+            </div>
 
-        <Link
-          to={administration.path}
-          className={`sidebar-link ${
-            location.pathname.startsWith('/admin') ? 'active' : ''
-          }`}
-        >
-          <span className="sidebar-icon">
-            <Icon name={administration.icon} size={19} />
-          </span>
+            <Link
+              to={administration.path}
+              className={`sidebar-link ${
+                location.pathname.startsWith('/admin') ? 'active' : ''
+              }`}
+            >
+              <span className="sidebar-icon">
+                <Icon name={administration.icon} size={19} />
+              </span>
 
-          <span>{administration.label}</span>
-        </Link>
+              <span>{administration.label}</span>
+            </Link>
+          </>
+        )}
 
         <div className="sidebar-bottom">
           <div className="sidebar-status-card">
