@@ -386,7 +386,15 @@ create policy branches_read on public.branches for select using (
       and ur.ended_at is null
       and r.code in ('COMPANY_ADMIN','COMPANY_DIRECTOR')
   )
-  or public.has_branch_access(id)
+  or exists (
+    select 1
+    from public.user_roles ur
+    join public.roles r on r.id=ur.role_id
+    where ur.user_id=auth.uid()
+      and ur.branch_id=branches.id
+      and ur.ended_at is null
+      and r.code in ('BRANCH_DIRECTOR','BRANCH_MANAGER','STORE_MANAGER','SECRETARY','GROUND_MANAGER','FINANCE_MANAGER')
+  )
 );
 
 -- Branch writes are intentionally not opened here.
