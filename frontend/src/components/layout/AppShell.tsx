@@ -335,40 +335,53 @@ export default function AppShell({ children }: AppShellProps) {
 
   const avatarLetters = initials(displayName);
 
-  const navigation = [
-    {
-      label: 'Dashboard',
-      path: '/dashboard',
-      icon: 'dashboard',
-    },
-    {
-      label: 'Users',
-      path: '/users',
-      icon: 'users',
-    },
-    ...(isPlatformAdmin
-      ? [{
-          label: 'Sent Invitations',
-          path: '/sent-invitations',
-          icon: 'bell',
-        }]
-      : []),
-    {
-      label: 'Companies',
-      path: '/companies',
-      icon: 'companies',
-    },
-    {
-      label: 'Transfers',
-      path: '/transfers',
-      icon: 'transfer',
-    },
-    {
-      label: 'Historical Data',
-      path: '/historical',
-      icon: 'history',
-    },
-  ];
+  const navigation = isAsomacAdmin
+    ? [
+        {
+          label: 'Dashboard',
+          path: '/dashboard',
+          icon: 'dashboard',
+        },
+        {
+          label: 'Company Registry',
+          path: '/companies',
+          icon: 'companies',
+        },
+      ]
+    : [
+        {
+          label: 'Dashboard',
+          path: '/dashboard',
+          icon: 'dashboard',
+        },
+        {
+          label: 'Users',
+          path: '/users',
+          icon: 'users',
+        },
+        ...(isPlatformAdmin
+          ? [{
+              label: 'Sent Invitations',
+              path: '/sent-invitations',
+              icon: 'bell',
+            }]
+          : []),
+        {
+          label: 'Companies',
+          path: '/companies',
+          icon: 'companies',
+        },
+        {
+          label: 'Transfers',
+          path: '/transfers',
+          icon: 'transfer',
+        },
+        {
+          label: 'Historical Data',
+          path: '/historical',
+          icon: 'history',
+        },
+      ];
 
   const administration = {
     label: 'Administration',
