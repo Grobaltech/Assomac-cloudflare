@@ -32,7 +32,7 @@ export default {async fetch(req:Request,env:Env){const u=new URL(req.url);if(req
       password,
       email_confirm:true,
       phone,
-      phone_confirm:false,
+      phone_confirm:true,
       user_metadata:{full_name:fullName}
     })
   });
