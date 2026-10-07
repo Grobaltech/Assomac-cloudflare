@@ -37,6 +37,7 @@ export default function Admin() {
   const [statusFilter, setStatusFilter] = useState('ALL');
 
   const [profile, setProfile] = useState<any>(null);
+  const [currentRole, setCurrentRole] = useState<string | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
 
   useEffect(() => {
@@ -44,10 +45,11 @@ export default function Admin() {
   }, []);
 
   useEffect(() => {
-    if (section === 'users' || section === 'administrators') {
+    if ((section === 'users' || section === 'administrators') &&
+        (currentRole === 'SUPER_ADMIN' || currentRole === 'ASSOMAC_ADMIN')) {
       loadUsers();
     }
-  }, [section]);
+  }, [section, currentRole]);
 
   async function loadCurrentProfile() {
     setLoadingProfile(true);
@@ -68,6 +70,21 @@ export default function Admin() {
       .maybeSingle();
 
     setProfile(data);
+
+    const { data: roleData } = await supabase
+      .from('user_roles')
+      .select('roles(code)')
+      .eq('user_id', user.id)
+      .is('ended_at', null)
+      .order('assigned_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const roleCode = Array.isArray(roleData?.roles)
+      ? roleData?.roles?.[0]?.code
+      : (roleData?.roles as any)?.code;
+
+    setCurrentRole(roleCode || null);
     setLoadingProfile(false);
   }
 
@@ -197,6 +214,19 @@ export default function Admin() {
     );
   }
 
+  if (currentRole !== 'SUPER_ADMIN' && currentRole !== 'ASSOMAC_ADMIN') {
+    return (
+      <div className="card p-8 text-center">
+        <h1 className="text-2xl font-black text-[#00194C]">Administration access required</h1>
+        <p className="text-slate-500 mt-2">This area is reserved for ASOMAC platform administrators.</p>
+      </div>
+    );
+  }
+
+  const administratorLabel = currentRole === 'SUPER_ADMIN'
+    ? 'SUPER ADMINISTRATOR'
+    : 'ASOMAC ADMINISTRATOR';
+
   return (
     <div className="space-y-6">
 
@@ -209,7 +239,7 @@ export default function Admin() {
 
           <div>
             <p className="text-[#f35a02] text-xs font-black tracking-[0.2em]">
-              SUPER ADMINISTRATOR
+              {administratorLabel}
             </p>
 
             <h1 className="text-3xl md:text-4xl font-black mt-2">
@@ -217,8 +247,8 @@ export default function Admin() {
             </h1>
 
             <p className="text-blue-100 mt-3 max-w-2xl">
-              Complete oversight of ASOMAC users, administrators,
-              organizations, security and platform activity.
+              Platform administration for ASOMAC users, organizations,
+              security, access control and system activity.
             </p>
           </div>
 
