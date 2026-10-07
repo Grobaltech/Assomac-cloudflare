@@ -26,6 +26,9 @@ export default function AcceptInvitation() {
   const [error, setError] = useState('');
   const [mode, setMode] = useState<'signup' | 'signin'>('signup');
   const [password, setPassword] = useState('');
+  const [otp, setOtp] = useState('');
+  const [phoneVerified, setPhoneVerified] = useState(false);
+  const [phoneSending, setPhoneSending] = useState(false);
 
   async function validate() {
     setLoading(true);
@@ -97,6 +100,37 @@ export default function AcceptInvitation() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
+  async function sendPhoneOtp(phoneNumber: string) {
+    if (!phoneNumber) {
+      throw new Error('This invitation does not contain a phone number.');
+    }
+    setPhoneSending(true);
+    const { error } = await supabase.auth.updateUser({ phone: phoneNumber });
+    setPhoneSending(false);
+    if (error) throw error;
+    setMessage(`A verification code has been sent to ${phoneNumber}.`);
+  }
+
+  async function verifyPhone() {
+    if (!invitation?.phone) return;
+    setProcessing(true);
+    setError('');
+    try {
+      const { error } = await supabase.auth.verifyOtp({
+        phone: invitation.phone,
+        token: otp.trim(),
+        type: 'phone_change',
+      });
+      if (error) throw error;
+      setPhoneVerified(true);
+      await acceptInvitation();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to verify your phone.');
+    } finally {
+      setProcessing(false);
+    }
+  }
+
   async function submitAuth(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -132,12 +166,13 @@ export default function AcceptInvitation() {
       }
 
       if (data.session) {
-        await acceptInvitation();
+        setMessage('Account created. Email verification is complete. We will now verify your phone.');
+        await sendPhoneOtp(invitation.phone || '');
         return;
       }
 
       setMessage(
-        'Your account has been created. Check your email and complete email verification, then return to this invitation link and sign in to finish activation.'
+        'Your account has been created. First verify your email using the message sent by ASOMAC. Then return here, sign in, and complete phone verification before activation.'
       );
       setProcessing(false);
       return;
@@ -160,7 +195,12 @@ export default function AcceptInvitation() {
       return;
     }
 
-    await acceptInvitation();
+    try {
+      await sendPhoneOtp(invitation.phone || '');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to send phone verification code.');
+      setProcessing(false);
+    }
   }
 
   if (loading) {
@@ -209,7 +249,32 @@ export default function AcceptInvitation() {
               </div>
             </div>
 
-            <form onSubmit={submitAuth} style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
+            {message && invitation.phone && !phoneVerified && (
+              <div style={{ padding: 16, marginBottom: 18, borderRadius: 15, background: '#fff7ed', border: '1px solid #fed7aa' }}>
+                <strong style={{ color: '#00194C' }}>Verify your phone number</strong>
+                <p style={{ fontSize: 13, color: '#536177' }}>
+                  Enter the verification code sent to <b>{invitation.phone}</b>. Both email and phone must be verified before this invitation can be activated.
+                </p>
+                <input
+                  value={otp}
+                  onChange={(event) => setOtp(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="6-digit verification code"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  style={{ width: '100%', boxSizing: 'border-box', minHeight: 46, padding: '0 14px', border: '1px solid #e0e6ee', borderRadius: 12, background: '#fff', marginBottom: 10 }}
+                />
+                <button type="button" className="primary-button" disabled={processing || phoneSending || otp.length < 6} onClick={verifyPhone}>
+                  {processing ? 'Verifying...' : 'Verify Phone & Activate'}
+                </button>
+                <button type="button" className="secondary-button" disabled={phoneSending} onClick={() => void sendPhoneOtp(invitation.phone || '')} style={{ marginTop: 8 }}>
+                  {phoneSending ? 'Sending...' : 'Resend code'}
+                </button>
+              </div>
+            )}
+
+            {!phoneVerified && !message && (
+              <form onSubmit={submitAuth} style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
               <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
                 <button type="button" className={mode === 'signup' ? 'primary-button' : 'secondary-button'} onClick={() => setMode('signup')}>
                   Create Account
@@ -245,6 +310,7 @@ export default function AcceptInvitation() {
                     : 'Sign In & Accept Invitation'}
               </button>
             </form>
+            )}
           </>
         )}
 
