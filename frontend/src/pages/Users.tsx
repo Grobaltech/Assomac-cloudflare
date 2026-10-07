@@ -804,7 +804,7 @@ export default function Users() {
     });
 
     try {
-      const response = await fetch('/api/email/check', {
+      const response = await fetch(`${apiBaseUrl}/api/email/check`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -846,6 +846,8 @@ export default function Users() {
     }
   }
 
+  const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || 'https://assomac-api.grobaltechtechnologies.workers.dev').replace(/\/$/, '');
+
   async function submitInvitation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage('');
@@ -864,14 +866,9 @@ export default function Users() {
       return;
     }
 
-    const emailIsValid = await checkInviteEmail(false);
-
-    if (!emailIsValid) {
-      setErrorMessage(
-        'Please correct the email address before sending the invitation.'
-      );
-      return;
-    }
+    // Email-server checking is advisory only. The invitation itself is
+    // created by the secured Supabase RPC, so a temporary mail-check
+    // service failure must never prevent invitation creation.
 
     if (!inviteRoles.length) {
       setErrorMessage(
@@ -979,7 +976,7 @@ export default function Users() {
     }
 
     const emailResponse =
-      await fetch('/api/invitations/send', {
+      await fetch(`${apiBaseUrl}/api/invitations/send`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2422,6 +2419,20 @@ export default function Users() {
                 </div>
 
               </div>
+
+              {errorMessage && (
+                <div className="invite-modal-error" role="alert">
+                  <span>!</span>
+                  <div>{errorMessage}</div>
+                </div>
+              )}
+
+              {message && (
+                <div className="invite-modal-message" role="status">
+                  <span>✓</span>
+                  <div>{message}</div>
+                </div>
+              )}
 
               {generatedInvitation && (
           <div className="generated-invitation">
