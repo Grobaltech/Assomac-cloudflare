@@ -1,3 +1,7 @@
+drop function if exists public.create_company_registry(
+  text,text,text,text,text,text,text,text,text,text,date,text,public.record_status
+);
+
 -- Phase 18: fix the company registration RPC used by Companies.tsx.
 -- The frontend supplies the three ASOMAC visibility flags, so the RPC must accept
 -- and persist them.
