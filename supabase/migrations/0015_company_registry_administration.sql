@@ -43,17 +43,34 @@ create index if not exists company_directors_company_idx
 alter table public.company_directors enable row level security;
 
 drop policy if exists company_directors_registry on public.company_directors;
-create policy company_directors_registry
+drop policy if exists company_directors_read on public.company_directors;
+drop policy if exists company_directors_write on public.company_directors;
+
+create policy company_directors_read
+on public.company_directors for select
+using (
+  public.is_super_admin()
+  or public.is_asomac_admin()
+  or exists (
+    select 1
+    from public.user_roles ur
+    join public.roles r on r.id=ur.role_id
+    where ur.user_id=auth.uid()
+      and ur.company_id=company_directors.company_id
+      and ur.ended_at is null
+      and r.code in ('COMPANY_ADMIN','COMPANY_DIRECTOR')
+  )
+);
+
+create policy company_directors_write
 on public.company_directors for all
 using (
   public.is_super_admin()
   or public.is_asomac_admin()
-  or public.has_company_management_access(company_id)
 )
 with check (
   public.is_super_admin()
   or public.is_asomac_admin()
-  or public.has_company_management_access(company_id)
 );
 
 create or replace function public.create_company_registry(
