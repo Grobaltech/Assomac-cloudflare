@@ -67,9 +67,9 @@ function AsomacChairpersonPanel() {
       </section>
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        <StatCard label="Registered Companies" value={loading ? '…' : companyCount} description="Companies in the ASOMAC registry" icon="▦" />
-        <StatCard label="Active Companies" value={loading ? '…' : activeCompanies} description="Currently active companies" icon="✓" />
-        <StatCard label="Pending Memberships" value={loading ? '…' : pendingCompanies} description="Companies awaiting membership action" icon="◷" />
+        <StatCard label="Registered Companies" value={loading ? 0 : companyCount} description="Companies in the ASOMAC registry" icon="▦" />
+        <StatCard label="Active Companies" value={loading ? 0 : activeCompanies} description="Currently active companies" icon="✓" />
+        <StatCard label="Pending Memberships" value={loading ? 0 : pendingCompanies} description="Companies awaiting membership action" icon="◷" />
       </div>
 
       <section className="card p-6">
