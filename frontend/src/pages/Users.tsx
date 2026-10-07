@@ -122,6 +122,10 @@ export default function Users() {
 
   const [showInviteModal, setShowInviteModal] =
     useState(false);
+  const [directAddMode, setDirectAddMode] =
+    useState(false);
+  const [addPassword, setAddPassword] =
+    useState('');
 
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
@@ -979,6 +983,73 @@ export default function Users() {
       }
     }
 
+    if (directAddMode) {
+      if (addPassword.length < 8) {
+        setErrorMessage('Initial password must contain at least 8 characters.');
+        return;
+      }
+
+      setSaving(true);
+      setMessage('Creating the user account...');
+      setErrorMessage('');
+
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const accessToken = sessionData.session?.access_token;
+
+        if (!accessToken) {
+          setErrorMessage('Your session has expired. Please sign in again.');
+          setSaving(false);
+          return;
+        }
+
+        const response = await fetch(`${apiBaseUrl}/api/admin/users/create`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            email,
+            full_name: inviteName.trim(),
+            phone,
+            country_code: inviteCountryCode,
+            password: addPassword,
+            role_id: selectedRole.id,
+            company_id:
+              roleScope === 'COMPANY' || roleScope === 'BRANCH'
+                ? inviteCompanyId
+                : null,
+            branch_id:
+              roleScope === 'BRANCH'
+                ? inviteBranchId
+                : null,
+          }),
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result?.error || 'Unable to create the user account.');
+        }
+
+        setMessage(result?.message || 'User created successfully.');
+        setAddPassword('');
+        await loadUsers(true);
+        setSaving(false);
+        return;
+      } catch (error) {
+        console.error(error);
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : 'Unable to create the user account.'
+        );
+        setSaving(false);
+        return;
+      }
+    }
+
     setSaving(true);
     setMessage('Creating the secure invitation...');
     setErrorMessage('');
@@ -1113,6 +1184,8 @@ export default function Users() {
                   setInviteName('');
                   setEmailCheck({ status: 'idle', message: '' });
                   setGeneratedInvitation(null);
+                  setAddPassword('');
+                  setDirectAddMode(false);
                   setMessage('');
                   setErrorMessage('');
                   setShowInviteModal(true)
@@ -1123,6 +1196,35 @@ export default function Users() {
           </span>
 
           Invite User
+        </button>
+
+        <button
+          type="button"
+          className="secondary-button"
+          onClick={() => {
+            setDirectAddMode(true);
+            setInviteEmail('');
+            setInviteEmailLocal('');
+            setInviteEmailDomain('gmail.com');
+            setInviteCustomEmailDomain('');
+            setInvitePhone('');
+            setInvitePhoneLocal('');
+            setInviteCountryCode('+256');
+            setInviteName('');
+            setInviteRole(inviteRoles[0]?.code || '');
+            setInviteCompanyId('');
+            setInviteBranchId('');
+            setInviteBranches([]);
+            setAddPassword('');
+            setEmailCheck({ status: 'idle', message: '' });
+            setGeneratedInvitation(null);
+            setMessage('');
+            setErrorMessage('');
+            setShowInviteModal(true);
+          }}
+        >
+          <span className="button-icon">+</span>
+          Add User
         </button>
       </div>
 
@@ -2392,6 +2494,22 @@ export default function Users() {
                     />
                   </div>
                   <small>Phone is stored in international format and will be used for OTP verification.</small>
+                  {directAddMode && (
+                    <div className="form-field">
+                      <label>Initial Password *</label>
+                      <input
+                        type="password"
+                        value={addPassword}
+                        onChange={(event) => setAddPassword(event.target.value)}
+                        placeholder="Minimum 8 characters"
+                        minLength={8}
+                        required
+                        autoComplete="new-password"
+                        disabled={saving}
+                      />
+                      <small>The administrator-created account has its email marked as confirmed. The user should change this password after first sign-in.</small>
+                    </div>
+                  )}
 
                 </div>
 
@@ -2598,14 +2716,15 @@ export default function Users() {
                     !inviteRole ||
                     !inviteRoles.some((role) => role.code === inviteRole) ||
                     (inviteRoleNeedsCompany() && !inviteCompanyId) ||
-                    (inviteRoleNeedsBranch() && !inviteBranchId)
+                    (inviteRoleNeedsBranch() && !inviteBranchId) ||
+                    (directAddMode && addPassword.length < 8)
                   }
                 >
                   {saving
-                    ? 'Sending Invitation...'
+                    ? (directAddMode ? 'Creating User...' : 'Sending Invitation...')
                     : emailChecking
                       ? 'Checking Email...'
-                      : 'Send Invitation'}
+                      : (directAddMode ? 'Create User' : 'Send Invitation')}
                 </button>
 
               </div>
