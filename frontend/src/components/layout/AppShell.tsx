@@ -215,6 +215,19 @@ export default function AppShell({ children }: AppShellProps) {
   }, []);
 
   useEffect(() => {
+    const handleViewport = () => {
+      document.documentElement.style.setProperty('--asomac-vh', `${window.innerHeight}px`);
+    };
+    handleViewport();
+    window.addEventListener('resize', handleViewport);
+    window.addEventListener('orientationchange', handleViewport);
+    return () => {
+      window.removeEventListener('resize', handleViewport);
+      window.removeEventListener('orientationchange', handleViewport);
+    };
+  }, []);
+
+  useEffect(() => {
     setMobileOpen(false);
     setProfileOpen(false);
   }, [location.pathname]);
