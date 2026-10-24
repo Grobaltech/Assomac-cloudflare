@@ -1,6 +1,6 @@
 /* Boxup-inspired visual system. Scoped to the public landing page to protect authenticated workflows. */
 @import url('https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@400;500;600;700&family=Lora:wght@500;600;700&family=Open+Sans:wght@400;500;600;700;800&display=swap');
-@import url('https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css');
+@import url('https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.5.1/animate.min.css');
 
 .boxup-site{--bx-primary:#06a3da;--bx-dark:#091e3e;--bx-light:#eef9ff;--bx-muted:#6b7280;font-family:'Open Sans',sans-serif;color:#6b7280;background:#fff;overflow:hidden}
 .boxup-site *{box-sizing:border-box}
