@@ -1,0 +1,26 @@
+name = "assomac-cloudflare"
+main = "frontend/worker.ts"
+compatibility_date = "2026-10-01"
+
+[assets]
+directory = "./frontend/dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+[previews.observability]
+enabled = true
+head_sampling_rate = 1
+
+[previews.observability.issues]
+enabled = false
+
+[previews.observability.logs]
+enabled = true
+head_sampling_rate = 1
+invocation_logs = true
+persist = true
+
+[previews.observability.traces]
+enabled = false
+head_sampling_rate = 1
+persist = true
