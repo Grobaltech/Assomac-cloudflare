@@ -1,0 +1,21 @@
+/* Boxup Tech design language for authenticated screens. Functional layout and role-aware navigation stay unchanged. */
+@import url('https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@400;500;600;700&family=Open+Sans:wght@400;500;600;700;800&display=swap');
+:root{--asomac-navy:#091e3e;--asomac-orange:#06a3da;--asomac-orange-light:#eef9ff;--page-bg:#f4f8fb;--card-bg:#fff;--text-main:#525f70;--text-muted:#6b7280;--border:#e7edf2;--shadow-card:0 5px 25px rgba(9,30,62,.08);--radius-lg:3px;--radius-md:3px;--radius-sm:2px}
+body{font-family:'Open Sans',sans-serif}
+h1,h2,h3,h4,h5,.asomac-content h1,.asomac-content h2,.asomac-content h3{font-family:'Josefin Sans',sans-serif;color:#091e3e}
+.asomac-sidebar{background:#fff;border-right:1px solid #e7edf2;box-shadow:2px 0 15px rgba(9,30,62,.025)}
+.brand-mark{border-radius:2px;background:#06a3da;box-shadow:none}
+.brand-text strong{font-family:'Josefin Sans',sans-serif;letter-spacing:.02em}
+.sidebar-link{border-radius:2px;font-weight:600;transition:background .2s,color .2s,border-color .2s; border-left:3px solid transparent}
+.sidebar-link:hover{background:#eef9ff;color:#06a3da;transform:none}
+.sidebar-link.active{background:#eef9ff;color:#06a3da;box-shadow:none;border-left-color:#06a3da}
+.asomac-topbar{background:#fff;border-bottom:1px solid #e7edf2;box-shadow:0 4px 20px rgba(9,30,62,.035)}
+.asomac-content{background:#f4f8fb}
+.card,.asomac-content .card{border:1px solid #edf1f5;border-radius:3px;box-shadow:0 5px 25px rgba(9,30,62,.06);transition:box-shadow .25s,transform .25s}
+.asomac-content .card:hover{box-shadow:0 12px 32px rgba(9,30,62,.09)}
+.asomac-content button:not(.sidebar-link):not(.mobile-menu-button):not(.notification-button):not(.profile-menu-item){transition:background .2s,color .2s,transform .2s,box-shadow .2s;border-radius:2px}
+.asomac-content input,.asomac-content select,.asomac-content textarea{border-radius:2px;border-color:#dce5ec}
+.asomac-content input:focus,.asomac-content select:focus,.asomac-content textarea:focus{outline:0;border-color:#06a3da;box-shadow:0 0 0 3px rgba(6,163,218,.12)}
+.profile-menu{border-radius:3px;box-shadow:0 15px 45px rgba(9,30,62,.16)}
+.profile-menu-item{border-radius:2px}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
